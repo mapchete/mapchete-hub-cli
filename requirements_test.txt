@@ -1,0 +1,6 @@
+mapchete_hub
+pytest
+pytest-cov
+pytest-env
+pytest-mongodb
+requests

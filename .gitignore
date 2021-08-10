@@ -1,0 +1,13 @@
+*.coverage*
+*.egg-info
+.eggs
+*.pyc
+__pycache__
+.pytest_cache
+*.gpkg
+htmlcov
+.env
+.credentials.map
+ec2_user_data.sh
+spot_config.json
+dask-worker-space/
