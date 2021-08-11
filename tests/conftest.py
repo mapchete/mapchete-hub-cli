@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import os
 import pytest
 from mapchete_hub.app import app, get_backend_db, get_dask_scheduler
 from mapchete_hub.db import BackendDB
@@ -31,6 +32,10 @@ def client():
 def mhub_api(client):
     return API(_test_client=client)
 
+@pytest.fixture
+def mhub_integration_api():
+    return API(os.environ.get("MHUB_HOST", "http://0.0.0.0:5000"))
+
 
 @pytest.fixture
 def test_process_id():
@@ -42,7 +47,7 @@ def example_config_json(tmpdir):
     return {
         "command": "execute",
         "params": {
-            "zoom": 8,
+            "zoom": 5,
             "bounds": [0, 1, 2, 3]
         },
         "config": {

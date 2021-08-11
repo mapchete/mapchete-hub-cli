@@ -5,6 +5,9 @@ from shapely.geometry import shape
 import time
 
 
+from mapchete_hub_cli import exceptions
+
+
 def test_get_root(mhub_api):
     response = mhub_api.get("/")
     assert response.status_code == 200
@@ -51,45 +54,124 @@ def test_job_state(mhub_api, example_config_json):
     assert mhub_api.job_state(job.job_id) == "done"
 
 
-def test_jobs(mhub_api, example_config_json):
-    """Return jobs metadata."""
-    before = len(mhub_api.jobs())
+def test_list_jobs_bounds(mhub_api, example_config_json):
+    job_id = mhub_api.start_job(
+        **dict(
+            example_config_json,
+            params=dict(example_config_json["params"], zoom=2)
+        )
+    ).job_id
 
-    job = mhub_api.start_job(**example_config_json)
-    job_id = job.job_id
+    # NotImplementedError: '$geoIntersects' is a valid operation but it is not supported by Mongomock yet.
+    with pytest.raises(NotImplementedError):
+        jobs = mhub_api.jobs(bounds=[0, 1, 2, 3])
+        assert job_id in jobs
+    with pytest.raises(NotImplementedError):
+        jobs = mhub_api.jobs(bounds=[10, 1, 12, 3])
+        assert job_id not in jobs
 
-    current = mhub_api.job(job_id)
-    geom = shape(current)
-    assert geom.is_valid
-    assert not geom.is_empty
 
-    # write another job
-    another_job = job = mhub_api.start_job(**example_config_json)
-    another_job_id = another_job.job_id
-    current = mhub_api.job(another_job_id)
-    geom = shape(current)
-    assert geom.is_valid
-    assert not geom.is_empty
+def test_list_jobs_output_path(mhub_api, example_config_json):
+    job_id = mhub_api.start_job(
+        **dict(
+            example_config_json,
+            params=dict(example_config_json["params"], zoom=2)
+        )
+    ).job_id
 
-    after = len(mhub_api.jobs())
-    assert after - before == 2
+    jobs = mhub_api.jobs(output_path=example_config_json["config"]["output"]["path"])
+    assert job_id in jobs
 
-    # TODO: filter by time
-    now = datetime.datetime.utcfromtimestamp(time.time())
-    # assert len(mhub_api.jobs(from_date=now)) == 0
+    jobs = mhub_api.jobs(output_path="foo")
+    assert job_id not in jobs
 
-    # filter by state
-    assert len(mhub_api.jobs(state="done")) == after
-    assert len(mhub_api.jobs(state="failed")) == 0
-    assert len(mhub_api.jobs(state="pending")) == 0
 
-    # filter by command
-    assert len(mhub_api.jobs(command="execute")) == after
+def test_list_jobs_state(mhub_api, example_config_json):
+    job_id = mhub_api.start_job(
+        **dict(
+            example_config_json,
+            params=dict(example_config_json["params"], zoom=2)
+        )
+    ).job_id
 
-    # filter by bounds
-    # '$geoIntersects' is a valid operation but it is not supported by Mongomock yet.
-    # assert len(mhub_api.jobs(bounds=[1, 2, 3, 4])) == after
-    # assert len(mhub_api.jobs(bounds=[11, 12, 13, 14])) == 0
+    jobs = mhub_api.jobs(state="done")
+    assert job_id in jobs
 
-    # filter by job_name
-    assert len(mhub_api.jobs(job_name="unnamed_job")) == 0
+    jobs = mhub_api.jobs(state="cancelled")
+    assert job_id not in jobs
+
+
+def test_list_jobs_job_name(mhub_api, example_config_json):
+    job_id = mhub_api.start_job(
+        **dict(
+            example_config_json,
+            params=dict(example_config_json["params"], zoom=2, job_name="foo")
+        )
+    ).job_id
+
+    jobs = mhub_api.jobs(job_name="foo")
+    assert job_id in jobs
+
+    jobs = mhub_api.jobs(job_name="bar")
+    assert job_id not in jobs
+
+
+def test_list_jobs_from_date(mhub_api, example_config_json):
+    job_id = mhub_api.start_job(
+        **dict(
+            example_config_json,
+            params=dict(example_config_json["params"], zoom=2, job_name="foo")
+        )
+    ).job_id
+
+    now = datetime.datetime.utcfromtimestamp(time.time()).strftime("%Y-%m-%dT%H:%M:%SZ")
+    jobs = mhub_api.jobs(from_date=now)
+    assert job_id in jobs
+
+    future = datetime.datetime.utcfromtimestamp(time.time() + 60).strftime("%Y-%m-%dT%H:%M:%SZ")
+    jobs = mhub_api.jobs(from_date=future)
+    assert job_id not in jobs
+
+
+def test_list_jobs_to_date(mhub_api, example_config_json):
+    job_id = mhub_api.start_job(
+        **dict(
+            example_config_json,
+            params=dict(example_config_json["params"], zoom=2, job_name="foo")
+        )
+    ).job_id
+
+    now = datetime.datetime.utcfromtimestamp(time.time() + 60).strftime("%Y-%m-%dT%H:%M:%SZ")
+    jobs = mhub_api.jobs(to_date=now)
+    assert job_id in jobs
+
+    past = datetime.datetime.utcfromtimestamp(time.time() - 60).strftime("%Y-%m-%dT%H:%M:%SZ")
+    jobs = mhub_api.jobs(to_date=past)
+    assert job_id not in jobs
+
+
+
+def test_errors(mhub_api, example_config_json):
+    # start job with invalid command
+    with pytest.raises(ValueError):
+        mhub_api.start_job(
+            **dict(
+                example_config_json,
+                command="foo"
+            )
+        )
+
+    # job rejected
+    with pytest.raises(exceptions.JobRejected):
+        mhub_api.start_job(
+            **dict(
+                example_config_json,
+                params="bar",
+            )
+        )
+
+    # job not found
+    with pytest.raises(exceptions.JobNotFound):
+        mhub_api.job("foo")
+    with pytest.raises(exceptions.JobNotFound):
+        mhub_api.cancel_job("foo")

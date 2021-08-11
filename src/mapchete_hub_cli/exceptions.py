@@ -16,3 +16,7 @@ class JobNotFound(Exception):
 
 class JobRejected(Exception):
     """Raise if job is rejected from server."""
+
+
+class JobCancelled(Exception):
+    """Raise if job is cancelled."""

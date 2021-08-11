@@ -20,7 +20,7 @@ import time
 import uuid
 import oyaml as yaml
 
-from mapchete_hub_cli.exceptions import JobFailed, JobNotFound, JobRejected
+from mapchete_hub_cli.exceptions import JobCancelled, JobFailed, JobNotFound, JobRejected
 
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class Job():
     """Job metadata class."""
 
     def __init__(
-        self, status_code=None, state=None, job_id=None, json=None
+        self, status_code=None, state=None, job_id=None, json=None, _api=None
     ):
         """Initialize."""
         self.status_code = status_code
@@ -48,13 +48,19 @@ class Job():
         self.exists = True if status_code == 409 else False
         self.json = OrderedDict(json.items())
         self.__geo_interface__ = self.json["geometry"]
+        self._api = _api
 
     def __repr__(self):  # pragma: no cover
         """Print Job."""
         return f"Job(status_code={self.status_code}, state={self.state}, job_id={self.job_id}, json={self.json}"
 
+    def wait(self, wait_for_max=None):
+        """Block until job has finished processing."""
+        list(self.progress(wait_for_max=wait_for_max))
 
-Response = namedtuple("Response", "status_code json")
+    def progress(self, wait_for_max=None):
+        """Yield job progress messages."""
+        yield from self._api.job_progress(self.job_id, wait_for_max=wait_for_max)
 
 
 class API():
@@ -77,7 +83,7 @@ class API():
             "PUT": self._api.put,
             "DELETE": self._api.delete,
         }
-        if request_type not in _request_func:
+        if request_type not in _request_func:  # pragma: no cover
             raise ValueError(f"unknown request type '{request_type}'")
         try:
             request_url = self._baseurl + url
@@ -85,13 +91,7 @@ class API():
             logger.debug(f"{request_type}: {request_url}, {request_kwargs}")
             res = _request_func[request_type](request_url, **request_kwargs)
             logger.debug(f"response: {res}")
-            return Response(
-                status_code=res.status_code,
-                json=(
-                    res.json if self._test_client else
-                    json.loads(res.text, object_pairs_hook=OrderedDict)
-                )
-            )
+            return res
         except ConnectionError:  # pragma: no cover
             raise ConnectionError(f"no mhub server found at {self.host}")
 
@@ -103,10 +103,6 @@ class API():
     def post(self, url, **kwargs):
         """Make a POST request to _test_client or host."""
         return self._request("POST", url, **kwargs)
-
-    def put(self, url, **kwargs):
-        """Make a PUT request to _test_client or host."""
-        return self._request("PUT", url, **kwargs)
 
     def delete(self, url, **kwargs):
         """Make a DELETE request to _test_client or host."""
@@ -154,7 +150,7 @@ class API():
         )
 
         # make sure correct command is provided
-        if command not in commands:
+        if command not in commands:  # pragma: no cover
             raise ValueError(f"invalid command given: {command}")
 
         logger.debug(f"send job to API")
@@ -173,7 +169,8 @@ class API():
                 status_code=res.status_code,
                 state=res.json()["properties"]["state"],
                 job_id=job_id,
-                json=res.json()
+                json=res.json(),
+                _api=self
             )
 
     def cancel_job(self, job_id):
@@ -188,7 +185,8 @@ class API():
             status_code=res.status_code,
             state=self.job_state(job_id),
             job_id=job_id,
-            json=res.json()
+            json=res.json(),
+            _api=self
         )
 
     def retry_job(self, job_id):
@@ -222,7 +220,8 @@ class API():
                     status_code=res.status_code,
                     state=res.json()["properties"]["state"],
                     job_id=job_id,
-                    json=res.json()
+                    json=res.json(),
+                    _api=self
                 )
             )
 
@@ -250,7 +249,8 @@ class API():
                     status_code=200,
                     state=job["properties"]["state"],
                     job_id=job["id"],
-                    json=job
+                    json=job,
+                    _api=self
                 )
                 for job in res.json()
             }
@@ -267,40 +267,34 @@ class API():
             ).json()
         }
 
-    def job_progress(self, job_id, interval=1, timeout=None):
+    def job_progress(self, job_id, interval=0.3, wait_for_max=None):
         """Yield job progress information."""
-        last = -1
-        updated = time.time()
+        start = time.time()
+        last_progress = 0
         while True:
-            job = self.job(job_id)
-            logger.debug(job.state)
-
-            if job.state in job_states["todo"]:
-                pass
-
-            if job.state in job_states["doing"]:
-                if job.state in ["RECEIVED", "STARTED"]:
-                    pass
-                if job.state in ["PROGRESS"]:
-                    logger.debug(job.json())
-                    x = job.json()["properties"]["progress_data"].get("current", None)
-                    current = -1 if x is None else x
-                    if current > last:
-                        last = job.json()["properties"]["progress_data"]["current"]
-                        updated = time.time()
-                        yield job.json()["properties"]
-
-            if job.state in job_states["done"]:
-                if job.state == "SUCCESS":
-                    yield job.json()["properties"]
-                    return
-                if job.state == "FAILURE":  # pragma: no cover
-                    raise JobFailed(job.json()["properties"]["traceback"])
-
-            if timeout is not None and time.time() - updated > timeout:
-                raise TimeoutError(f"no update since {timeout} seconds")
-
+            if wait_for_max is not None and time.time() - start > wait_for_max:
+                raise RuntimeError(f"job not done in time, last state was '{state}'")
             time.sleep(interval)
+            job = self.job(job_id)
+            properties = job.json["properties"]
+            if job.state == "pending":
+                continue
+            elif job.state in ["aborting", "running"]:
+                current_progress = properties["current_progress"]
+                if current_progress > last_progress:
+                    yield dict(
+                        state=job.state,
+                        current_progress=current_progress,
+                        total_progress=properties["total_progress"]
+                    )
+                    last_progress = current_progress
+            elif job.state == "cancelled":
+                raise JobCancelled(f"job {job_id} cancelled")
+            elif job.state == "failed":
+                raise JobFailed(f"job failed with {properties['exception']} \n{properties['traceback']}")
+            elif job.state == "done":
+                return
+
 
     def _get_kwargs(self, kwargs):
         """
