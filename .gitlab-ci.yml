@@ -1,0 +1,45 @@
+stages:
+  - build
+  - test
+    - package
+
+# python packaging & EOX PyPy releases #
+########################################
+
+# build python packages
+build_python:
+  image: python:3.8-slim-buster
+  stage: build
+  artifacts:
+    paths:
+      - dist/
+  script:
+    - pip wheel . --no-deps --wheel-dir dist/
+    - python setup.py sdist
+
+# test python packages
+test_wheel:
+  image: python:3.8-slim-buster
+  needs: ["build_python"]
+  stage: test
+  script:
+    - pip install dist/*.whl
+    - ls
+    - mhub --help
+
+test_tar:
+  image: python:3.8-slim-buster
+  needs: ["build_python"]
+  stage: test
+  script:
+    - pip install dist/*.tar.gz
+    - mhub --help
+
+package:
+  image: python:3.8-slim-buster
+  stage: package
+  script:
+    - pip install twine
+    - python -m twine upload --repository-url https://gitlab.eox.at/api/v4/projects/255/packages/pypi dist/mapchete_hub_cli*
+  only:
+    - tags
