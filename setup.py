@@ -15,6 +15,7 @@ with open("src/mapchete_hub_cli/__init__.py") as f:
 
 install_requires = [
     "click",
+    "oyaml",
     "requests",
     "tqdm",
 ]
