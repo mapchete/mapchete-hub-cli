@@ -621,11 +621,11 @@ def _print_job_details(job, verbose=False):
         click.echo(f"output path: {mapchete_config.get('output', {}).get('path')}")
 
         # bounds
-        try:
-            # bounds = ", ".join(map(str, shape(job).bounds))
-        except:  # pragma: no cover
-            bounds = None
-        click.echo(f"bounds: {bounds}")
+        # try:
+        #     bounds = ", ".join(map(str, shape(job).bounds))
+        # except:  # pragma: no cover
+        #     bounds = None
+        # click.echo(f"bounds: {bounds}")
 
         # start time
         started = properties.get("started", "unknown")
