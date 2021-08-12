@@ -2,6 +2,7 @@ import click
 from datetime import datetime, timedelta
 from itertools import chain
 import logging
+from shapely.geometry import shape
 from tqdm import tqdm
 
 from mapchete_hub_cli import API, commands, default_timeout, job_states, __version__
@@ -11,32 +12,11 @@ from mapchete_hub_cli.log import set_log_level
 
 logger = logging.getLogger(__name__)
 
-# https://github.com/tqdm/tqdm/issues/481
-tqdm.monitor_interval = 0
-
-
 host_options = dict(host_ip="0.0.0.0", port=5000)
 
 
-def str_to_date(date_str):
-    """Convert string to datetime object."""
-    if "T" in date_str:
-        add_zulu = "Z" if date_str.endswith("Z") else ""
-        try:
-            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%f" + add_zulu)
-        except ValueError:
-            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S" + add_zulu)
-    else:
-        return datetime(*map(int, date_str.split('-')))
-
-
-def date_to_str(date_obj, microseconds=True):
-    """Return string from datetime object in the format."""
-    return date_obj.strftime(
-        "%Y-%m-%dT%H:%M:%S.%fZ" if microseconds else "%Y-%m-%dT%H:%M:%SZ"
-    )
-
-
+# click callbacks #
+###################
 def _set_debug_log_level(ctx, param, debug):
     if debug:  # pragma: no cover
         set_log_level(logging.DEBUG)
@@ -45,6 +25,23 @@ def _set_debug_log_level(ctx, param, debug):
 
 def _get_timestamp(ctx, param, timestamp):
     """Convert timestamp to datetime object."""
+    def str_to_date(date_str):
+        """Convert string to datetime object."""
+        if "T" in date_str:
+            add_zulu = "Z" if date_str.endswith("Z") else ""
+            try:
+                return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%f" + add_zulu)
+            except ValueError:
+                return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S" + add_zulu)
+        else:
+            return datetime(*map(int, date_str.split('-')))
+
+
+    def date_to_str(date_obj, microseconds=True):
+        """Return string from datetime object in the format."""
+        return date_obj.strftime(
+            "%Y-%m-%dT%H:%M:%S.%fZ" if microseconds else "%Y-%m-%dT%H:%M:%SZ"
+        )
     if timestamp:
         try:
             # for a convertable timestamp like '2019-11-01T15:00:00'
@@ -103,18 +100,8 @@ def _validate_zoom(ctx, param, zoom):
             raise click.BadParameter(e)
 
 
-def _validate_bounds(ctx, param, bounds):
-    if bounds:
-        try:
-            if not isinstance(bounds, (tuple, list)):
-                raise TypeError(f"bounds must be either a tuple or a list: {bounds}")
-            if len(bounds) != 4:
-                raise ValueError(f"bounds has to have exactly four values: {bounds}")
-            return bounds
-        except Exception as e:
-            raise click.BadParameter(e)
-
-
+# click arguments and options #
+###############################
 arg_mapchete_files = click.argument(
     "mapchete_files",
     type=click.Path(exists=True),
@@ -132,7 +119,6 @@ opt_bounds = click.option(
     "-b",
     type=click.FLOAT,
     nargs=4,
-    callback=_validate_bounds,
     help="Left, bottom, right, top bounds in tile pyramid CRS.",
 )
 opt_bounds_crs = click.option(
@@ -175,6 +161,11 @@ opt_debug = click.option(
     is_flag=True,
     callback=_set_debug_log_level,
     help="Print debug log output."
+)
+opt_job_name = click.option(
+    "--job-name",
+    type=click.STRING,
+    help="Name of job."
 )
 opt_geojson = click.option(
     "--geojson", "-g",
@@ -225,11 +216,6 @@ opt_until = click.option(
     callback=_get_timestamp,
     help="Filter jobs by timestamp until given time.",
 )
-opt_job_name = click.option(
-    "--job-name", "-n",
-    type=click.STRING,
-    help="Filter jobs job name."
-)
 opt_job_ids = click.option(
     "--job-ids", "-j",
     type=click.STRING,
@@ -259,9 +245,9 @@ opt_sort_by = click.option(
     "--host", "-h",
     type=click.STRING,
     nargs=1,
-    default="{}:{}".format(host_options["host_ip"], host_options["port"]),
+    default=f"{host_options['host_ip']}:{host_options['port']}",
     help="""Address and port of mhub endpoint (default: """
-        f"""{host_options["host_ip"]}:{host_options["port"]})."""
+        f"""{host_options['host_ip']}:{host_options['port']})."""
 )
 @click.option(
     "--timeout",
@@ -276,112 +262,6 @@ def mhub(ctx, host, **kwargs):
     host = host if host.endswith("/") else f"{host}/"
     ctx.obj = dict(host=host, **kwargs)
 
-
-@mhub.command(short_help="Show available processes.")
-@click.option(
-    "--process_name", "-n", type=click.STRING, help="Print docstring of process."
-)
-@click.option(
-    "--docstrings", is_flag=True, help="Print docstrings of all processes."
-)
-@opt_debug
-@click.pass_context
-def processes(ctx, process_name=None, docstrings=False, **kwargs):
-    """Show available processes."""
-    def _print_process_info(process_module, docstrings=False):
-        click.echo(
-            click.style(
-                process_module["name"],
-                bold=docstrings,
-                underline=docstrings
-            )
-        )
-        if docstrings:
-            click.echo(process_module["docstring"])
-
-    try:
-        res = API(**ctx.obj).get("capabilities.json")
-        if res.status_code != 200:  # pragma: no cover
-            raise ConnectionError(res.json)
-        cap = res.json
-
-        # get all registered processes
-        processes = cap.get("processes")
-
-        # print selected process
-        if process_name:
-            _print_process_info(processes[process_name], docstrings=True)
-        else:
-            # print all processes
-            click.echo(f"{len(processes)} processes found")
-            for process_name in sorted(processes.keys()):
-                _print_process_info(processes[process_name], docstrings=docstrings)
-    except Exception as e:  # pragma: no cover
-        raise click.ClickException(e)
-
-
-@mhub.command(help="Execute a process.")
-@arg_mapchete_files
-@opt_zoom
-@opt_bounds
-@opt_point
-@opt_tile
-@opt_overwrite
-@opt_verbose
-@opt_debug
-@click.pass_context
-def execute(
-    ctx,
-    mapchete_files,
-    overwrite=False,
-    verbose=False,
-    debug=False,
-    **kwargs
-):
-    """Execute a process."""
-    for mapchete_file in mapchete_files:
-        try:
-            job = API(**ctx.obj).start_job(
-                mapchete_config=mapchete_file,
-                mode="overwrite" if overwrite else "continue",
-                command="execute",
-                **kwargs
-            )
-            if verbose:  # pragma: no cover
-                click.echo(f"job {job.job_id} state: {job.state}")
-                _show_progress(ctx, job.job_id, disable=debug)
-            else:
-                click.echo(job.job_id)
-        except Exception as e:  # pragma: no cover
-            raise click.ClickException(e)
-
-
-@mhub.command(short_help="Show job status.")
-@click.argument("job_id", type=click.STRING)
-@opt_geojson
-@click.option(
-    "--traceback",
-    is_flag=True,
-    help="Print only traceback if available."
-)
-@opt_debug
-@click.pass_context
-def status(ctx, job_id, geojson=False, traceback=False, **kwargs):
-    """Show job status."""
-    try:
-        response = (
-            API(**ctx.obj).job(job_id, geojson=geojson)
-            if geojson
-            else API(**ctx.obj).job(job_id)
-        )
-        if geojson:  # pragma: no cover
-            click.echo(response)
-        elif traceback:  # pragma: no cover
-            click.echo(response.json["properties"].get("traceback"))
-        else:
-            _print_job_details(response, verbose=True)
-    except Exception as e:  # pragma: no cover
-        raise click.ClickException(e)
 
 
 @mhub.command(short_help="Cancel jobs.")
@@ -433,9 +313,9 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
             click.echo(job_id)
         if force or click.confirm(f"Do you really want to cancel {len(job_ids)} job(s)?", abort=True):
             for job_id in job_ids:
-                    job = API(**ctx.obj).cancel_job(job_id)
-                    logger.debug(job.json)
-                    click.echo(job.json["message"])
+                job = API(**ctx.obj).cancel_job(job_id)
+                logger.debug(job.json)
+                click.echo(f"job {job.state}")
 
     except Exception as e:  # pragma: no cover
         if debug:
@@ -443,93 +323,70 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
         raise click.ClickException(e)
 
 
-@mhub.command(short_help="Retry jobs.")
-@click.option(
-    "--no-children",
-    is_flag=True,
-    help="Don't retry child jobs."
-)
-@opt_job_ids
-@opt_output_path
-@opt_state
-@opt_command
-@opt_queue
-@opt_since_no_default
-@opt_until
-@opt_job_name
-@opt_force
+@mhub.command(help="Execute a process.")
+@arg_mapchete_files
+@opt_zoom
+@opt_bounds
+@opt_point
+@opt_tile
 @opt_overwrite
-@opt_debug
 @opt_verbose
 @opt_debug
+@opt_job_name
 @click.pass_context
-def retry(
+def execute(
     ctx,
-    job_ids=None,
+    mapchete_files,
     overwrite=False,
     verbose=False,
-    no_children=False,
-    force=False,
     debug=False,
     **kwargs
 ):
-    """Retry jobs and their follow-up jobs if batch was submitted."""
-    kwargs.update(
-        from_date=kwargs.pop("since"),
-        to_date=kwargs.pop("until")
-    )
-
-    try:
-        if job_ids:
-            jobs = [API(**ctx.obj).job(job_id) for job_id in job_ids]
-
-        else:
-            if all([v is None for v in kwargs.values()]):  # pragma: no cover
-                click.echo(ctx.get_help())
-                raise click.UsageError(
-                    "Please either provide one or more job IDs or other search values."
+    """Execute a process."""
+    for mapchete_file in mapchete_files:
+        try:
+            job = API(**ctx.obj).start_job(
+                command="execute",
+                config=mapchete_file,
+                params=dict(
+                    kwargs,
+                    mode="overwrite" if overwrite else "continue",
                 )
-            jobs = API(**ctx.obj).jobs(**kwargs).values()
-
-        def _yield_retryable_jobs(jobs):
-            for j in jobs:
-                if j.state not in job_states["done"]:
-                    click.echo(f"Job {j.job_id} still in state {j.state}.")
-                else:
-                    yield j.job_id
-
-        job_ids = [j for j in _yield_retryable_jobs(jobs)]
-
-        if not job_ids:  # pragma: no cover
-            click.echo("No retryable jobs found.")
-            return
-
-        for job_id in job_ids:
-            click.echo(job_id)
-        if force or click.confirm(f"Do you really want to retry {len(job_ids)} job(s)?", abort=True):
-            for job_id in job_ids:
-                    job = API(**ctx.obj).retry_job(
-                        job_id,
-                        mode="overwrite" if overwrite else "continue",
-                        no_children=no_children,
-                        **kwargs
-                    )
-                    logger.debug(job.json)
-                    click.echo(job.json["message"])
-    except Exception as e:  # pragma: no cover
-        if debug:
+            )
+            if verbose:  # pragma: no cover
+                click.echo(f"job {job.job_id} {job.state}")
+                _show_progress(ctx, job.job_id, disable=debug)
+            else:
+                click.echo(job.job_id)
+        except Exception as e:  # pragma: no cover
             raise
-        raise click.ClickException(e)
+            raise click.ClickException(e)
 
 
-@mhub.command(short_help="Show job progress.")
+@mhub.command(short_help="Show job status.")
 @click.argument("job_id", type=click.STRING)
+@opt_geojson
+@click.option(
+    "--traceback",
+    is_flag=True,
+    help="Print only traceback if available."
+)
 @opt_debug
 @click.pass_context
-def progress(ctx, job_id, debug=False):
-    """Show job progress."""
+def job(ctx, job_id, geojson=False, traceback=False, **kwargs):
+    """Show job status."""
     try:
-        _show_progress(ctx, job_id, disable=debug)
+        response = (
+            API(**ctx.obj).job(job_id, geojson=geojson)
+            if geojson
+            else API(**ctx.obj).job(job_id)
+        )
+        if geojson:  # pragma: no cover
+            click.echo(response)
+        elif traceback:  # pragma: no cover
+            click.echo(response.json["properties"].get("traceback"))
+        else:
+            _print_job_details(response, verbose=True)
     except Exception as e:  # pragma: no cover
         raise click.ClickException(e)
 
@@ -557,10 +414,31 @@ def jobs(
     **kwargs
 ):
     """Show current jobs."""
-    kwargs.update(
-        from_date=kwargs.pop("since"),
-        to_date=kwargs.pop("until")
-    )
+
+    def _sort_jobs(jobs, sort_by=None):
+        if sort_by == "state":
+            return list(
+                sorted(
+                    jobs,
+                    key=lambda x: (
+                        x.json["properties"]["state"],
+                        x.json["properties"]["updated"]
+                    )
+                )
+            )
+        elif sort_by in ["started", "runtime"]:
+            return list(
+                sorted(jobs, key=lambda x: x.json["properties"][sort_by] or 0.)
+            )
+        elif sort_by == "progress":
+            def _get_progress(job):
+                properties = job.json.get("properties", {})
+                current = properties.get("current_progress")
+                total = properties.get("total_progress")
+                return 100 * current / total if total else 0.
+            return list(sorted(jobs, key=lambda x: _get_progress(x)))
+
+    kwargs.update(from_date=kwargs.pop("since"), to_date=kwargs.pop("until"))
     try:
         if geojson:
             click.echo(
@@ -575,10 +453,136 @@ def jobs(
             for i in jobs:
                 _print_job_details(i, verbose=verbose)
     except Exception as e:  # pragma: no cover
+        raise
         raise click.ClickException(e)
 
 
+@mhub.command(short_help="Show available processes.")
+@click.option(
+    "--process_name", "-n", type=click.STRING, help="Print docstring of process."
+)
+@click.option(
+    "--docstrings", is_flag=True, help="Print docstrings of all processes."
+)
+@opt_debug
+@click.pass_context
+def processes(ctx, process_name=None, docstrings=False, **kwargs):
+    """Show available processes."""
+    def _print_process_info(process_module, docstrings=False):
+        click.echo(
+            click.style(
+                process_module["title"],
+                bold=docstrings,
+                underline=docstrings
+            )
+        )
+        if docstrings:
+            click.echo(process_module["description"])
+
+    try:
+        res = API(**ctx.obj).get("processes")
+        if res.status_code != 200:  # pragma: no cover
+            raise ConnectionError(res.json())
+
+        # get all registered processes
+        processes = {
+            p.get("title"): p
+            for p in res.json().get("processes")
+        }
+
+        # print selected process
+        if process_name:
+            _print_process_info(processes[process_name], docstrings=True)
+        else:
+            # print all processes
+            click.echo(f"{len(processes)} processes found")
+            for process_name in sorted(processes.keys()):
+                _print_process_info(processes[process_name], docstrings=docstrings)
+    except Exception as e:  # pragma: no cover
+        raise click.ClickException(e)
+
+
+@mhub.command(short_help="Retry jobs.")
+@opt_job_ids
+@opt_output_path
+@opt_state
+@opt_command
+@opt_queue
+@opt_since_no_default
+@opt_until
+@opt_job_name
+@opt_force
+@opt_overwrite
+@opt_debug
+@opt_verbose
+@opt_debug
+@click.pass_context
+def retry(
+    ctx,
+    job_ids=None,
+    overwrite=False,
+    verbose=False,
+    force=False,
+    debug=False,
+    **kwargs
+):
+    """Retry jobs and their follow-up jobs if batch was submitted."""
+    kwargs.update(
+        from_date=kwargs.pop("since"),
+        to_date=kwargs.pop("until")
+    )
+
+    try:
+        if job_ids:
+            jobs = [API(**ctx.obj).job(job_id) for job_id in job_ids]
+
+        else:
+            if all([v is None for v in kwargs.values()]):  # pragma: no cover
+                click.echo(ctx.get_help())
+                raise click.UsageError(
+                    "Please either provide one or more job IDs or other search values."
+                )
+            jobs = API(**ctx.obj).jobs(**kwargs).values()
+
+        def _yield_retryable_jobs(jobs):
+            for j in jobs:
+                if j.state not in job_states["done"]:  # pragma: no cover
+                    click.echo(f"Job {j.job_id} still in state {j.state}.")
+                else:
+                    yield j.job_id
+
+        job_ids = [j for j in _yield_retryable_jobs(jobs)]
+
+        if not job_ids:  # pragma: no cover
+            click.echo("No retryable jobs found.")
+            return
+
+        for job_id in job_ids:
+            click.echo(job_id)
+        if force or click.confirm(f"Do you really want to retry {len(job_ids)} job(s)?", abort=True):
+            for job_id in job_ids:
+                job = API(**ctx.obj).retry_job(job_id)
+                click.echo(f"job {job.state}")
+    except Exception as e:  # pragma: no cover
+        if debug:
+            raise
+        raise click.ClickException(e)
+
+
+# helper fucntions #
+####################
 def _print_job_details(job, verbose=False):
+
+    def _pretty_runtime(elapsed):
+        minutes, seconds = divmod(elapsed, 60)
+        hours, minutes = divmod(minutes, 60)
+        if hours:  # pragma: no cover
+            return f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
+        elif minutes:  # pragma: no cover
+            return f"{int(minutes)}m {int(seconds)}s"
+        else:
+            return f"{round(seconds, 3)}s"
+
     for group, states in job_states.items():  # pragma: no cover
         for state in states:
             if job.state == state:
@@ -586,11 +590,11 @@ def _print_job_details(job, verbose=False):
                     color = "blue"
                 elif group == "doing":
                     color = "yellow"
-                elif state == "SUCCESS":
+                elif state == "done":
                     color = "green"
-                elif state == "FAILURE":
+                elif state == "failed":
                     color = "red"
-                elif state in ["TERMINATED", "REVOKED"]:
+                elif state in ["aborting", "cancelled"]:
                     color = "magenta"
     properties = job.json["properties"]
     mapchete_config = properties.get("mapchete", {}).get("config", {})
@@ -606,53 +610,38 @@ def _print_job_details(job, verbose=False):
         click.echo(click.style(f"state: {job.state}"))
 
         # progress
-        progress_data = properties.get("progress_data", {}) or {}
-        current = progress_data.get("current")
-        total = progress_data.get("total")
+        current = properties.get("current_progress")
+        total = properties.get("total_progress")
         progress = round(100 * current / total, 2) if total else 0.
         click.echo(f"progress: {progress}%")
 
         # command
         click.echo(f"command: {properties.get('command')}")
 
-        # queue
-        click.echo(f"queue: {properties.get('queue')}")
-
-        # worker
-        click.echo(f"worker: {properties.get('hostname')}")
-
         # output path
         click.echo(f"output path: {mapchete_config.get('output', {}).get('path')}")
 
         # bounds
         try:
-            bounds = ", ".join(map(str, shape(job.json["geometry"]).bounds))
+            bounds = ", ".join(map(str, shape(job).bounds))
         except:  # pragma: no cover
             bounds = None
         click.echo(f"bounds: {bounds}")
 
-        # previous job ID
-        click.echo(f"previous_job_id: {properties.get('previous_job_id')}")
-
-        # next job ID
-        click.echo(f"next_job_id: {properties.get('next_job_id')}")
-
         # start time
-        started = date_to_str(
-            datetime.utcfromtimestamp(properties.get("started")),
-            microseconds=False
-        ) if properties.get("started") else None
+        started = properties.get("started", "unknown")
         click.echo(f"started: {started}")
 
+        # finish time
+        finished = properties.get("finished", "unknown")
+        click.echo(f"finished: {finished}")
+
         # runtime
-        runtime = properties.get("runtime")
-        click.echo(f"runtime: {Timer(runtime) if runtime else None}")
+        runtime = properties.get("runtime", "unknown")
+        click.echo(f"runtime: {_pretty_runtime(runtime) if runtime else None}")
 
         # last received update
-        last_update = date_to_str(
-            datetime.utcfromtimestamp(properties.get("timestamp")),
-            microseconds=False
-        ) if properties.get("timestamp") else "unknown"
+        last_update = properties.get("updated", "unknown")
         click.echo(f"last received update: {last_update}")
 
         # append newline
@@ -661,55 +650,18 @@ def _print_job_details(job, verbose=False):
 
 def _show_progress(ctx, job_id, disable=False):
     try:
-        with click_spinner.spinner(disable=disable):
-            states = API(**ctx.obj).job_progress(job_id)
-            i = next(states)
-        if i["state"] == "SUCCESS":  # pragma: no cover
-            click.echo(
-                f"job {job_id} successfully finished in {Timer(elapsed=i['runtime'])}"
-            )
-            return
-
-        if i["state"] in job_states["doing"]:  # pragma: no cover
-            with tqdm(
-                initial=i["progress_data"]["current"],
-                total=i["progress_data"]["total"],
-                disable=disable
-            ) as pbar:
-                for i in states:
-                    pbar.n = i["progress_data"]["current"]
-                    pbar.last_print_n = i["progress_data"]["current"]
-                    pbar.refresh()
-                    pbar.update()
+        progress = API(**ctx.obj).job(job_id).progress()
+        click.echo("wait for job progress...")
+        i = next(progress)
+        last_progress = 0
+        with tqdm(total=i["total_progress"], disable=disable) as pbar:
+            for i in progress:
+                current_progress = i["current_progress"]
+                pbar.update(current_progress - last_progress)
+                last_progress = current_progress
+        click.echo(f"job {i['state']}")
     except JobFailed as e:  # pragma: no cover
-        click.echo(f"Job {job_id} failed")
-        click.echo(e)
+        click.echo(f"Job {job_id} failed: {e}")
         return
     except Exception as e:  # pragma: no cover
         raise click.ClickException(e)
-
-
-def _sort_jobs(jobs, sort_by=None):
-    if sort_by == "state":
-        return list(
-            sorted(
-                jobs,
-                key=lambda x: (
-                    x.json["properties"]["state"],
-                    x.json["properties"]["timestamp"]
-                )
-            )
-        )
-    elif sort_by in ["started", "runtime"]:
-        return list(
-            sorted(jobs, key=lambda x: x.json["properties"][sort_by] or 0.)
-        )
-    elif sort_by == "progress":
-        def _get_progress(job):
-            progress_data = (
-                job.json.get("properties", {}).get("progress_data", {}) or {}
-            )
-            current = progress_data.get("current")
-            total = progress_data.get("total")
-            return 100 * current / total if total else 0.
-        return list(sorted(jobs, key=lambda x: _get_progress(x)))

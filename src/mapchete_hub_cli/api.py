@@ -54,13 +54,13 @@ class Job():
         """Print Job."""
         return f"Job(status_code={self.status_code}, state={self.state}, job_id={self.job_id}, json={self.json}"
 
-    def wait(self, wait_for_max=None):
+    def wait(self, wait_for_max=None, raise_exc=True):
         """Block until job has finished processing."""
-        list(self.progress(wait_for_max=wait_for_max))
+        list(self.progress(wait_for_max=wait_for_max, raise_exc=raise_exc))
 
-    def progress(self, wait_for_max=None):
+    def progress(self, wait_for_max=None, raise_exc=True):
         """Yield job progress messages."""
-        yield from self._api.job_progress(self.job_id, wait_for_max=wait_for_max)
+        yield from self._api.job_progress(self.job_id, wait_for_max=wait_for_max, raise_exc=raise_exc)
 
 
 class API():
@@ -112,7 +112,8 @@ class API():
         self,
         command="execute",
         config=None,
-        params=None
+        params=None,
+        basedir=None
     ):
         """
         Start a job and return job state.
@@ -143,9 +144,10 @@ class API():
         -------
         mapchete_hub.api.Job
         """
+        basedir = basedir or os.getcwd()
         job = OrderedDict(
             command=command,
-            config=load_mapchete_config(config),
+            config=load_mapchete_config(config, basedir),
             params=params or {}
         )
 
@@ -207,14 +209,14 @@ class API():
             params=existing_job.json["properties"]["mapchete"]["params"]
         )
 
-    def job(self, job_id, geojson=False):
+    def job(self, job_id, geojson=False, indent=4):
         """Return job metadata."""
         res = self.get(f"jobs/{job_id}", timeout=self.timeout)
         if res.status_code == 404:
             raise JobNotFound(f"job {job_id} does not exist")
         else:
             return (
-                format_as_geojson(res.json())
+                json.dumps(res.json(), indent=indent)
                 if geojson
                 else Job(
                     status_code=res.status_code,
@@ -229,7 +231,7 @@ class API():
         """Return job state."""
         return self.job(job_id).state
 
-    def jobs(self, geojson=False, bounds=None, **kwargs):
+    def jobs(self, geojson=False, indent=4, bounds=None, **kwargs):
         """Return jobs metadata."""
         res = self.get(
             "jobs",
@@ -242,7 +244,7 @@ class API():
         if res.status_code != 200:  # pragma: no cover
             raise Exception(res.json())
         return (
-            format_as_geojson(res.json())
+            json.dumps(res.json(), indent=indent)
             if geojson
             else {
                 job["id"]: Job(
@@ -252,34 +254,33 @@ class API():
                     json=job,
                     _api=self
                 )
-                for job in res.json()
+                for job in res.json()["features"]
             }
         )
 
     def jobs_states(self, output_path=None):
         """Return jobs states."""
         return {
-            job["properties"]["job_id"]: job["properties"]["state"]
-            for job in self.get(
-                "jobs",
+            job_id: job.state
+            for job_id, job in self.jobs(
                 timeout=self.timeout,
-                params=dict(output_path=output_path)
-            ).json()
+                output_path=output_path
+            ).items()
         }
 
-    def job_progress(self, job_id, interval=0.3, wait_for_max=None):
+    def job_progress(self, job_id, interval=0.3, wait_for_max=None, raise_exc=True):
         """Yield job progress information."""
         start = time.time()
         last_progress = 0
         while True:
-            if wait_for_max is not None and time.time() - start > wait_for_max:
+            if wait_for_max is not None and time.time() - start > wait_for_max:  # pragma: no cover
                 raise RuntimeError(f"job not done in time, last state was '{state}'")
             time.sleep(interval)
             job = self.job(job_id)
             properties = job.json["properties"]
-            if job.state == "pending":
+            if job.state == "pending":  # pragma: no cover
                 continue
-            elif job.state in ["aborting", "running"]:
+            elif job.state in ["aborting", "running"] and properties.get("total_progress"):
                 current_progress = properties["current_progress"]
                 if current_progress > last_progress:
                     yield dict(
@@ -289,10 +290,28 @@ class API():
                     )
                     last_progress = current_progress
             elif job.state == "cancelled":
-                raise JobCancelled(f"job {job_id} cancelled")
+                if raise_exc:
+                    raise JobCancelled(f"job {job_id} cancelled")
+                else:  # pragma: no cover
+                    return
             elif job.state == "failed":
-                raise JobFailed(f"job failed with {properties['exception']} \n{properties['traceback']}")
+                if raise_exc:
+                    raise JobFailed(f"job failed with {properties['exception']}")
+                else:  # pragma: no cover
+                    return
             elif job.state == "done":
+                current_progress = properties.get("current_progress")
+                total_progress = properties.get("total_progress")
+                if (
+                    current_progress is not None and total_progress is not None
+                ) and (
+                    current_progress == total_progress
+                ):
+                    yield dict(
+                        state=job.state,
+                        current_progress=current_progress,
+                        total_progress=total_progress
+                    )
                 return
 
 
@@ -307,79 +326,8 @@ class API():
             kwargs.pop("timeout", None)
         return kwargs
 
-    def _batch_config_from_job(self, job):
-        def _next_job(job):
-            yield job
-            next_job_id = job.json()["properties"].get("next_job_id")
-            if next_job_id:
-                yield from _next_job(self.job(next_job_id))
 
-        def _param_not_empty(p):
-            if p is None:
-                return False
-            if isinstance(p, (list, tuple)) and not len(p):
-                return False
-            return True
-
-
-        def _job_to_batch(job):
-            """
-            properties/mapchete/config --> mapchete
-            properties/mapchete/params --> root
-            """
-            return OrderedDict(
-                mapchete=job.json()["properties"]["mapchete"]["config"],
-                command=job.json()["properties"]["mapchete"]["command"],
-                **{
-                    k: v
-                    for k, v in job.json()["properties"]["mapchete"]["params"].items()
-                    if _param_not_empty(v)
-                }
-            )
-
-        return dict(
-            jobs=OrderedDict(
-                (job.json()["properties"]["job_name"], _job_to_batch(job))
-                for job in _next_job(job)
-            )
-        )
-
-
-def format_as_geojson(inp, indent=4):
-    """Return a pretty GeoJSON."""
-    space = " " * indent
-    out_gj = (
-        '{{\n'
-        f'{space}"type": "FeatureCollection",\n'
-        f'{space}"features": [\n'
-    )
-    features = (i for i in ([inp] if isinstance(inp, dict) else inp))
-    try:
-        feature = next(features)
-        level = 2
-        while True:
-            feature_gj = (space * level).join(
-                json.dumps(
-                    json.loads(
-                        str(geojson.Feature(**feature)), object_pairs_hook=OrderedDict
-                    ),
-                    indent=indent,
-                    sort_keys=True
-                ).splitlines(True)
-            )
-            try:
-                feature = next(features)
-                out_gj += f"{space * level}{feature_gj},\n"
-            except StopIteration:
-                out_gj += f"{space * level}{feature_gj}\n"
-                break
-    except StopIteration:  # pragma: no cover
-        pass
-    out_gj += f"{space}]\n}}"
-    return out_gj
-
-
-def load_mapchete_config(mapchete_config):
+def load_mapchete_config(mapchete_config, basedir=None):
     """
     Return preprocessed mapchete config provided as dict or file.
 
@@ -400,18 +348,26 @@ def load_mapchete_config(mapchete_config):
         Preprocessed mapchete configuration.
     """
     if isinstance(mapchete_config, (dict)):
-        return cleanup_datetime(mapchete_config)
-
+        conf = cleanup_datetime(mapchete_config)
     elif isinstance(mapchete_config, str):
+        basedir = os.path.dirname(mapchete_config)
         conf = cleanup_datetime(yaml.safe_load(open(mapchete_config, "r").read()))
+    else:  # pragma: no cover
+        raise TypeError(
+            "mapchete config must either be a path to an existing file or a dict"
+        )
 
-        if not conf.get("process"):  # pragma: no cover
-            raise KeyError("no or empty process in configuration")
+    process = conf.get("process")
 
+    # handle process
+    if not process:  # pragma: no cover
+        raise KeyError("no or empty process in configuration")
+
+    if isinstance(process, str):
         # local python file
         if conf.get("process").endswith(".py"):
             custom_process_path = os.path.join(
-                os.path.dirname(mapchete_config),
+                basedir,
                 conf.get("process")
             )
             # check syntax
@@ -420,18 +376,9 @@ def load_mapchete_config(mapchete_config):
             process_code = open(custom_process_path).read()
             if not process_code:  # pragma: no cover
                 raise ValueError("process file is empty")
-            conf.update(
-                process=base64.standard_b64encode(
-                    process_code.encode("utf-8")
-                ).decode("utf-8")
-            )
+            conf.update(process=process_code.splitlines())
 
-        return conf
-
-    else:  # pragma: no cover
-        raise TypeError(
-            "mapchete config must either be a path to an existing file or a dict"
-        )
+    return conf
 
 
 def cleanup_datetime(d):
