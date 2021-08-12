@@ -5,13 +5,10 @@ This module wraps around the requests module for real-life usage and FastAPI's T
 in order to be able to test mhub CLI.
 """
 
-import base64
 from collections import namedtuple, OrderedDict
 import datetime
-import geojson
 import json
 import logging
-from mapchete.validate import validate_zooms
 import os
 import py_compile
 import requests

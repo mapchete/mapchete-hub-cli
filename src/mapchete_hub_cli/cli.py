@@ -2,7 +2,6 @@ import click
 from datetime import datetime, timedelta
 from itertools import chain
 import logging
-from shapely.geometry import shape
 from tqdm import tqdm
 
 from mapchete_hub_cli import API, commands, default_timeout, job_states, __version__
@@ -623,7 +622,7 @@ def _print_job_details(job, verbose=False):
 
         # bounds
         try:
-            bounds = ", ".join(map(str, shape(job).bounds))
+            # bounds = ", ".join(map(str, shape(job).bounds))
         except:  # pragma: no cover
             bounds = None
         click.echo(f"bounds: {bounds}")
