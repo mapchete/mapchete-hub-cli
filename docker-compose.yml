@@ -1,0 +1,54 @@
+version: "3.6"
+
+services:
+
+  db:
+    image: mongo:4.2.7-bionic
+    networks:
+      - backend
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=mhub
+      - MONGO_INITDB_ROOT_PASSWORD=uu9ieTh1
+      # https://github.com/docker-library/mongo/issues/329
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js
+    volumes:
+      - db-data:/data/db
+    command: ["--bind_ip_all"]
+
+  server:
+    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:fastapi_dask
+    depends_on:
+      - dask_scheduler
+      - db
+    environment:
+      - MHUB_DASK_SCHEDULER_URL=tcp://dask_scheduler:8786
+      - MHUB_MONGODB_URL=mongodb://mhub:uu9ieTh1@db:27017
+    networks:
+      - backend
+    ports:
+      - ${MHUB_PORT:-5000}:5000
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+    command: ["uvicorn", "mapchete_hub.app:app", "--host", "0.0.0.0", "--port", "5000", "--log-level", "debug"]
+
+  dask_scheduler:
+    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:fastapi_dask
+    networks:
+      - backend
+    command: ["dask-scheduler", "--host", "dask_scheduler", "--port", "8786"]
+
+  dask_worker:
+    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:fastapi_dask
+    depends_on:
+      - dask_scheduler
+    networks:
+      - backend
+    command: ["dask-worker", "--nthreads", "2", "--nprocs", "8", "tcp://dask_scheduler:8786"]
+
+volumes:
+  db-data:
+
+networks:
+  backend:

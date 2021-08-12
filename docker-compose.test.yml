@@ -1,0 +1,14 @@
+version: "3.6"
+
+services:
+
+  mhub_tester:
+    environment:
+      - MHUB_HOST=http://server:${MHUB_PORT:-5000}
+    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:fastapi_dask
+    command: /bin/bash -c "pip install -e . && pip install -r requirements_test.txt && pytest -v --cov=mapchete_hub_cli && coverage report"
+    networks:
+      - backend
+
+networks:
+  backend:
