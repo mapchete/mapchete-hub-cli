@@ -1,7 +1,7 @@
 stages:
   - build
   - test
-    - package
+  - package
 
 # python packaging & EOX PyPy releases #
 ########################################
