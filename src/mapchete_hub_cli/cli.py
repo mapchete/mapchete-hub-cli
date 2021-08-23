@@ -7,7 +7,7 @@ from tqdm import tqdm
 from mapchete_hub_cli import API, commands, default_timeout, job_states, __version__
 from mapchete_hub_cli.exceptions import JobFailed
 from mapchete_hub_cli.log import set_log_level
-
+from mapchete_hub_cli.settings import WORKER_DEFAULT_SPECS
 
 logger = logging.getLogger(__name__)
 
@@ -191,10 +191,10 @@ opt_command = click.option(
     type=click.Choice(commands),
     help="Filter jobs by command."
 )
-opt_queue = click.option(
-    "--queue", "-q",
-    type=click.STRING,
-    help="Filter jobs by queue."
+opt_worker_specs = click.option(
+    "--worker_specs", "-w",
+    type=click.Choice(WORKER_DEFAULT_SPECS.keys()),
+    help="Choose worker performace."
 )
 opt_since = click.option(
     "--since",
@@ -268,7 +268,6 @@ def mhub(ctx, host, **kwargs):
 @opt_output_path
 @opt_state
 @opt_command
-@opt_queue
 @opt_since_no_default
 @opt_until
 @opt_job_name
@@ -330,6 +329,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
 @opt_tile
 @opt_overwrite
 @opt_verbose
+@opt_worker_specs
 @opt_debug
 @opt_job_name
 @click.pass_context
@@ -394,7 +394,6 @@ def job(ctx, job_id, geojson=False, traceback=False, **kwargs):
 @opt_output_path
 @opt_state
 @opt_command
-@opt_queue
 @opt_since
 @opt_until
 @opt_job_name
@@ -506,7 +505,7 @@ def processes(ctx, process_name=None, docstrings=False, **kwargs):
 @opt_output_path
 @opt_state
 @opt_command
-@opt_queue
+@opt_worker_specs
 @opt_since_no_default
 @opt_until
 @opt_job_name
