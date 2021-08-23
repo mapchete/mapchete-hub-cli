@@ -194,6 +194,7 @@ opt_command = click.option(
 opt_worker_specs = click.option(
     "--worker_specs", "-w",
     type=click.Choice(WORKER_DEFAULT_SPECS.keys()),
+    default="default",
     help="Choose worker performace."
 )
 opt_since = click.option(
@@ -505,7 +506,6 @@ def processes(ctx, process_name=None, docstrings=False, **kwargs):
 @opt_output_path
 @opt_state
 @opt_command
-@opt_worker_specs
 @opt_since_no_default
 @opt_until
 @opt_job_name
