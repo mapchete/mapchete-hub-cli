@@ -1,3 +1,4 @@
+import json
 import click
 from datetime import datetime, timedelta
 from itertools import chain
@@ -7,7 +8,6 @@ from tqdm import tqdm
 from mapchete_hub_cli import API, commands, default_timeout, job_states, __version__
 from mapchete_hub_cli.exceptions import JobFailed
 from mapchete_hub_cli.log import set_log_level
-from mapchete_hub_cli.settings import WORKER_DEFAULT_SPECS
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,16 @@ def _set_debug_log_level(ctx, param, debug):
     if debug:  # pragma: no cover
         set_log_level(logging.DEBUG)
     return debug
+
+
+def _check_worker_specs(ctx, param, worker_specs):
+    res = API(**ctx.obj).get("worker_specs")
+    if res.status_code != 200:  # pragma: no cover
+        raise ConnectionError(res.json())
+    for w in res.json().keys():
+        if worker_specs not in res.json().keys():
+            raise TypeError(f"Worker not in {res.json().keys()}!!!")
+    return worker_specs
 
 
 def _get_timestamp(ctx, param, timestamp):
@@ -193,9 +203,10 @@ opt_command = click.option(
 )
 opt_worker_specs = click.option(
     "--worker_specs", "-w",
-    type=click.Choice(WORKER_DEFAULT_SPECS.keys()),
+    type=click.STRING,
+    callback=_check_worker_specs,
     default="default",
-    help="Choose worker performace."
+    help="Choose worker performance class."
 )
 opt_since = click.option(
     "--since",
@@ -499,6 +510,16 @@ def processes(ctx, process_name=None, docstrings=False, **kwargs):
                 _print_process_info(processes[process_name], docstrings=docstrings)
     except Exception as e:  # pragma: no cover
         raise click.ClickException(e)
+
+
+@mhub.command(short_help="Show available worker specs.")
+@opt_debug
+@click.pass_context
+def worker_specs(ctx, **kwargs):
+    res = API(**ctx.obj).get("worker_specs")
+    if res.status_code != 200:  # pragma: no cover
+        raise ConnectionError(res.json())
+    click.echo(json.dumps(res.json(), indent=4, sort_keys=True))
 
 
 @mhub.command(short_help="Retry jobs.")
