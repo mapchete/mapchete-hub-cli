@@ -28,8 +28,7 @@ def _check_worker_specs(ctx, param, worker_specs):
         raise ConnectionError(res.json())
     for w in res.json().keys():
         if worker_specs not in res.json().keys():
-            raise TypeError(f"Worker not in {res.json().keys()}!!!")
-    return worker_specs
+            raise TypeError(f"Worker specs name not in {res.json().keys()}!!!")
 
 
 def _get_timestamp(ctx, param, timestamp):
