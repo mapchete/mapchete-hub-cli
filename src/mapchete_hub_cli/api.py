@@ -63,12 +63,22 @@ class Job():
 class API():
     """API class which abstracts REST interface."""
 
-    def __init__(self, host="localhost:5000", timeout=None, _test_client=None, **kwargs):
+    def __init__(
+        self,
+        host="localhost:5000",
+        timeout=None,
+        user=None,
+        password=None,
+        _test_client=None,
+        **kwargs
+    ):
         """Initialize."""
         host = host if host.startswith("http") else f"http://{host}"
         host = host if host.endswith("/") else f"{host}/"
         self.host = host if host.endswith("/") else f"{host}/"
         self.timeout = timeout or default_timeout
+        self._user = user
+        self._password = password
         self._test_client = _test_client
         self._api = _test_client if _test_client else requests
         self._baseurl = "" if _test_client else host
@@ -321,7 +331,10 @@ class API():
         """
         if self._test_client:  # pragma: no cover
             kwargs.pop("timeout", None)
-        return kwargs
+        return dict(
+            kwargs,
+            auth=(self._user, self._password)
+        )
 
 
 def load_mapchete_config(mapchete_config, basedir=None):

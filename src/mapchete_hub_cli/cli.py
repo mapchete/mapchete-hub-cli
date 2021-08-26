@@ -237,6 +237,16 @@ opt_sort_by = click.option(
     default="state",
     help="Sort jobs. (default: state)"
 )
+opt_mhub_user = click.option(
+    "--user", "-u",
+    type=click.STRING,
+    help="Username for basic auth."
+)
+opt_mhub_password = click.option(
+    "--password", "-p",
+    type=click.STRING,
+    help="Password for basic auth."
+)
 
 @click.version_option(version=__version__, message="%(version)s")
 @click.group(help="Process control on Mapchete Hub.")
@@ -254,13 +264,14 @@ opt_sort_by = click.option(
     default=default_timeout,
     help=f"Time in seconds to wait for server response. (default: {default_timeout})"
 )
+@opt_mhub_user
+@opt_mhub_password
 @click.pass_context
 def mhub(ctx, host, **kwargs):
     """Main command group."""
     host = host if host.startswith("http") else f"http://{host}"
     host = host if host.endswith("/") else f"{host}/"
     ctx.obj = dict(host=host, **kwargs)
-
 
 
 @mhub.command(short_help="Cancel jobs.")
