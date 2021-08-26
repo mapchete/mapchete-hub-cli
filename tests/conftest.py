@@ -12,7 +12,6 @@ import yaml
 from mapchete_hub_cli import API
 from mapchete_hub_cli.cli import mhub
 
-
 _fake_backend_db = BackendDB(mongomock.MongoClient())
 _dask_cluster = LocalCluster()
 
