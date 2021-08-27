@@ -155,6 +155,9 @@ opt_overwrite = click.option(
 opt_verbose = click.option(
     "--verbose", "-v", is_flag=True, help="Print info for each process tile."
 )
+opt_progress = click.option(
+    "--progress", is_flag=True, help="Show progress in progress bar."
+)
 opt_debug = click.option(
     "--debug", "-d",
     is_flag=True,
@@ -237,6 +240,16 @@ opt_sort_by = click.option(
     default="state",
     help="Sort jobs. (default: state)"
 )
+opt_mhub_user = click.option(
+    "--user", "-u",
+    type=click.STRING,
+    help="Username for basic auth."
+)
+opt_mhub_password = click.option(
+    "--password", "-p",
+    type=click.STRING,
+    help="Password for basic auth."
+)
 
 @click.version_option(version=__version__, message="%(version)s")
 @click.group(help="Process control on Mapchete Hub.")
@@ -254,13 +267,14 @@ opt_sort_by = click.option(
     default=default_timeout,
     help=f"Time in seconds to wait for server response. (default: {default_timeout})"
 )
+@opt_mhub_user
+@opt_mhub_password
 @click.pass_context
 def mhub(ctx, host, **kwargs):
     """Main command group."""
     host = host if host.startswith("http") else f"http://{host}"
     host = host if host.endswith("/") else f"{host}/"
     ctx.obj = dict(host=host, **kwargs)
-
 
 
 @mhub.command(short_help="Cancel jobs.")
@@ -370,22 +384,22 @@ def execute(
     is_flag=True,
     help="Print only traceback if available."
 )
+@opt_progress
 @opt_debug
 @click.pass_context
-def job(ctx, job_id, geojson=False, traceback=False, **kwargs):
+def job(ctx, job_id, geojson=False, traceback=False, progress=False, debug=False, **kwargs):
     """Show job status."""
     try:
-        response = (
-            API(**ctx.obj).job(job_id, geojson=geojson)
-            if geojson
-            else API(**ctx.obj).job(job_id)
-        )
+        job = API(**ctx.obj).job(job_id, geojson=geojson)
         if geojson:  # pragma: no cover
-            click.echo(response)
+            click.echo(job)
         elif traceback:  # pragma: no cover
-            click.echo(response.json["properties"].get("traceback"))
+            click.echo(job.json["properties"].get("traceback"))
+        if progress:  # pragma: no cover
+            click.echo(f"job {job.job_id} {job.state}")
+            _show_progress(ctx, job_id, disable=debug)
         else:
-            _print_job_details(response, verbose=True)
+            _print_job_details(job, verbose=True)
     except Exception as e:  # pragma: no cover
         raise click.ClickException(e)
 

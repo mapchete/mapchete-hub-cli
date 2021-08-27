@@ -1,33 +1,34 @@
 from click.testing import CliRunner
 from collections import namedtuple
-from dask.distributed import Client
+from dask.distributed import LocalCluster
 from fastapi.testclient import TestClient
 import os
 import pytest
-from mapchete_hub.app import app, get_backend_db, get_dask_client
+from mapchete_hub.app import app, get_backend_db, get_dask
 from mapchete_hub.db import BackendDB
 import mongomock.database
 import yaml
-
 
 from mapchete_hub_cli import API
 from mapchete_hub_cli.cli import mhub
 
 
 _fake_backend_db = BackendDB(mongomock.MongoClient())
-_dask_client = Client()
+_dask_cluster = LocalCluster()
 
 
 def fake_backend_db():
     return _fake_backend_db
 
 
-def local_dask_client():
-    return _dask_client
-
+def local_dask_cluster():
+    return {
+        "flavor" : "local_cluster",
+        "cluster": _dask_cluster
+    }
 
 app.dependency_overrides[get_backend_db] = fake_backend_db
-app.dependency_overrides[get_dask_client] = local_dask_client
+app.dependency_overrides[get_dask] = local_dask_cluster
 
 
 @pytest.fixture(scope="session")
