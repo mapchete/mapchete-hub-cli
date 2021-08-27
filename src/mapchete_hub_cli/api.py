@@ -144,6 +144,10 @@ class API():
             Zoom, row and column of process tile.
         geometry : str
             GeoJSON representaion of process area.
+        worker_specs: str
+            One of EOX Mhub worker spec names choose from: [
+                default|s2_16bit_regular|s2_16bit_large|s1_large|custom
+            ]
         zoom : list or int
             Minimum and maximum zoom level or single zoom level.
 

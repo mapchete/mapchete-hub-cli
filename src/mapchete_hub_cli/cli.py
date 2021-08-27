@@ -1,3 +1,4 @@
+import json
 import click
 from datetime import datetime, timedelta
 from itertools import chain
@@ -7,7 +8,6 @@ from tqdm import tqdm
 from mapchete_hub_cli import API, commands, default_timeout, job_states, __version__
 from mapchete_hub_cli.exceptions import JobFailed
 from mapchete_hub_cli.log import set_log_level
-
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,15 @@ def _set_debug_log_level(ctx, param, debug):
     if debug:  # pragma: no cover
         set_log_level(logging.DEBUG)
     return debug
+
+
+def _check_worker_specs(ctx, param, worker_specs):
+    res = API(**ctx.obj).get("worker_specs")
+    if res.status_code != 200:  # pragma: no cover
+        raise ConnectionError(res.json())
+    for w in res.json().keys():
+        if worker_specs not in res.json().keys():
+            raise TypeError(f"Worker specs name not in {res.json().keys()}!!!")
 
 
 def _get_timestamp(ctx, param, timestamp):
@@ -194,10 +203,12 @@ opt_command = click.option(
     type=click.Choice(commands),
     help="Filter jobs by command."
 )
-opt_queue = click.option(
-    "--queue", "-q",
+opt_worker_specs = click.option(
+    "--worker_specs", "-w",
     type=click.STRING,
-    help="Filter jobs by queue."
+    callback=_check_worker_specs,
+    default="default",
+    help="Choose worker performance class."
 )
 opt_since = click.option(
     "--since",
@@ -282,7 +293,6 @@ def mhub(ctx, host, **kwargs):
 @opt_output_path
 @opt_state
 @opt_command
-@opt_queue
 @opt_since_no_default
 @opt_until
 @opt_job_name
@@ -344,6 +354,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
 @opt_tile
 @opt_overwrite
 @opt_verbose
+@opt_worker_specs
 @opt_debug
 @opt_job_name
 @click.pass_context
@@ -408,7 +419,6 @@ def job(ctx, job_id, geojson=False, traceback=False, progress=False, debug=False
 @opt_output_path
 @opt_state
 @opt_command
-@opt_queue
 @opt_since
 @opt_until
 @opt_job_name
@@ -515,12 +525,21 @@ def processes(ctx, process_name=None, docstrings=False, **kwargs):
         raise click.ClickException(e)
 
 
+@mhub.command(short_help="Show available worker specs.")
+@opt_debug
+@click.pass_context
+def worker_specs(ctx, **kwargs):
+    res = API(**ctx.obj).get("worker_specs")
+    if res.status_code != 200:  # pragma: no cover
+        raise ConnectionError(res.json())
+    click.echo(json.dumps(res.json(), indent=4, sort_keys=True))
+
+
 @mhub.command(short_help="Retry jobs.")
 @opt_job_ids
 @opt_output_path
 @opt_state
 @opt_command
-@opt_queue
 @opt_since_no_default
 @opt_until
 @opt_job_name
