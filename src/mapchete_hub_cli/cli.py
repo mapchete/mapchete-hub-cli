@@ -405,6 +405,7 @@ def job(ctx, job_id, geojson=False, traceback=False, progress=False, debug=False
         if geojson:  # pragma: no cover
             click.echo(job)
         elif traceback:  # pragma: no cover
+            click.echo(job.json["properties"].get("exception"))
             click.echo(job.json["properties"].get("traceback"))
         if progress:  # pragma: no cover
             click.echo(f"job {job.job_id} {job.state}")
