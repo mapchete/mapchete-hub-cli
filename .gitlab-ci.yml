@@ -57,7 +57,7 @@ test_mhub:
         -f docker-compose.yml \
         -f docker-compose.test.yml \
         up \
-        --exit-code-from mhub_tester \
+        --exit-code-from mhub_cli_tester \
         --build
 
   after_script:

@@ -2,18 +2,20 @@ version: "3.6"
 
 services:
 
-  mhub_tester:
-    environment:
-      - MHUB_HOST=http://server:${MHUB_PORT:-5000}
+  mhub_cli_tester:
     build:
       context: .
       args:
         BASE_IMAGE: registry.gitlab.eox.at/maps/mapchete_hub/mhub
         BASE_IMAGE_TAG: "0.20"
         EOX_PYPI_TOKEN: ${EOX_PYPI_TOKEN}
-    command: /bin/bash -c "pytest -v --cov=mapchete_hub_cli && coverage report"
+    depends_on:
+      - server
+    environment:
+      - MHUB_HOST=http://server:${MHUB_PORT:-5000}
+    command: /bin/bash -c "echo $MHUB_HOST; sleep 5; pytest -v --cov=mapchete_hub_cli && coverage report"
     networks:
-      - backend
+      - frontend
 
 networks:
-  backend:
+  frontend:

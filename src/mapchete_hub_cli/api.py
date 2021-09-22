@@ -79,10 +79,14 @@ class API():
         **kwargs
     ):
         """Initialize."""
-        host = os.environ.get("MHUB_HOST", host)
+        env_host = os.environ.get("MHUB_HOST")
+        if env_host:
+            logger.debug(f"got mhub host from env: {env_host}")
+            host = env_host
         host = host if host.startswith("http") else f"http://{host}"
         host = host if host.endswith("/") else f"{host}/"
         self.host = host if host.endswith("/") else f"{host}/"
+        logger.debug(f"use host name {self.host}")
         self.timeout = timeout or default_timeout
         self._user = user
         self._password = password
