@@ -53,7 +53,9 @@ def test_start_job_failing_process(mhub_client, example_config_process_exception
     assert mhub_client.job(job.job_id).state == "failed"
 
 
-@pytest.mark.skip(reason="the background task does not run in the background in TestClient")
+@pytest.mark.skip(
+    reason="the background task does not run in the background in TestClient"
+)
 def test_cancel_job(mhub_client, example_config_json):
     """Cancel existing job."""
     job = mhub_client.start_job(**example_config_json)
@@ -98,10 +100,7 @@ def test_job_states(mhub_client, example_config_json):
 
 def test_list_jobs_bounds(mhub_client, example_config_json):
     job_id = mhub_client.start_job(
-        **dict(
-            example_config_json,
-            params=dict(example_config_json["params"], zoom=2)
-        )
+        **dict(example_config_json, params=dict(example_config_json["params"], zoom=2))
     ).job_id
 
     # NotImplementedError: '$geoIntersects' is a valid operation but it is not supported by Mongomock yet.
@@ -115,10 +114,7 @@ def test_list_jobs_bounds(mhub_client, example_config_json):
 
 def test_list_jobs_output_path(mhub_client, example_config_json):
     job_id = mhub_client.start_job(
-        **dict(
-            example_config_json,
-            params=dict(example_config_json["params"], zoom=2)
-        )
+        **dict(example_config_json, params=dict(example_config_json["params"], zoom=2))
     ).job_id
 
     jobs = mhub_client.jobs(output_path=example_config_json["config"]["output"]["path"])
@@ -130,10 +126,7 @@ def test_list_jobs_output_path(mhub_client, example_config_json):
 
 def test_list_jobs_state(mhub_client, example_config_json):
     job_id = mhub_client.start_job(
-        **dict(
-            example_config_json,
-            params=dict(example_config_json["params"], zoom=2)
-        )
+        **dict(example_config_json, params=dict(example_config_json["params"], zoom=2))
     ).job_id
 
     jobs = mhub_client.jobs(state="done")
@@ -147,7 +140,7 @@ def test_list_jobs_job_name(mhub_client, example_config_json):
     job_id = mhub_client.start_job(
         **dict(
             example_config_json,
-            params=dict(example_config_json["params"], zoom=2, job_name="foo")
+            params=dict(example_config_json["params"], zoom=2, job_name="foo"),
         )
     ).job_id
 
@@ -162,7 +155,7 @@ def test_list_jobs_from_date(mhub_client, example_config_json):
     job_id = mhub_client.start_job(
         **dict(
             example_config_json,
-            params=dict(example_config_json["params"], zoom=2, job_name="foo")
+            params=dict(example_config_json["params"], zoom=2, job_name="foo"),
         )
     ).job_id
 
@@ -170,7 +163,9 @@ def test_list_jobs_from_date(mhub_client, example_config_json):
     jobs = mhub_client.jobs(from_date=now)
     assert job_id in jobs
 
-    future = datetime.datetime.utcfromtimestamp(time.time() + 60).strftime("%Y-%m-%dT%H:%M:%SZ")
+    future = datetime.datetime.utcfromtimestamp(time.time() + 60).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
     jobs = mhub_client.jobs(from_date=future)
     assert job_id not in jobs
 
@@ -179,15 +174,19 @@ def test_list_jobs_to_date(mhub_client, example_config_json):
     job_id = mhub_client.start_job(
         **dict(
             example_config_json,
-            params=dict(example_config_json["params"], zoom=2, job_name="foo")
+            params=dict(example_config_json["params"], zoom=2, job_name="foo"),
         )
     ).job_id
 
-    now = datetime.datetime.utcfromtimestamp(time.time() + 60).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = datetime.datetime.utcfromtimestamp(time.time() + 60).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
     jobs = mhub_client.jobs(to_date=now)
     assert job_id in jobs
 
-    past = datetime.datetime.utcfromtimestamp(time.time() - 60).strftime("%Y-%m-%dT%H:%M:%SZ")
+    past = datetime.datetime.utcfromtimestamp(time.time() - 60).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
     jobs = mhub_client.jobs(to_date=past)
     assert job_id not in jobs
 
@@ -196,7 +195,7 @@ def test_geojson_output(mhub_client, example_config_json):
     job = mhub_client.start_job(
         **dict(
             example_config_json,
-            params=dict(example_config_json["params"], zoom=2, job_name="foo")
+            params=dict(example_config_json["params"], zoom=2, job_name="foo"),
         )
     )
     job.wait(wait_for_max=120)
@@ -216,12 +215,7 @@ def test_geojson_output(mhub_client, example_config_json):
 def test_errors(mhub_client, example_config_json):
     # start job with invalid command
     with pytest.raises(ValueError):
-        mhub_client.start_job(
-            **dict(
-                example_config_json,
-                command="foo"
-            )
-        )
+        mhub_client.start_job(**dict(example_config_json, command="foo"))
 
     # job rejected
     with pytest.raises(exceptions.JobRejected):

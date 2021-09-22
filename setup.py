@@ -43,9 +43,7 @@ setup(
         "mapchete.cli.commands": ["mhub=mapchete_hub_cli.cli:mhub"],
     },
     install_requires=install_requires,
-    extras_require={
-        "test": test_requires
-    },
+    extras_require={"test": test_requires},
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
@@ -55,5 +53,5 @@ setup(
         "Programming Language :: Python :: 3.8",
     ],
     setup_requires=["pytest-runner"],
-    tests_require=["pytest"]
+    tests_require=["pytest"],
 )

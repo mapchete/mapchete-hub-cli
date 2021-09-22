@@ -17,7 +17,13 @@ import time
 import uuid
 import oyaml as yaml
 
-from mapchete_hub_cli.exceptions import JobAborting, JobCancelled, JobFailed, JobNotFound, JobRejected
+from mapchete_hub_cli.exceptions import (
+    JobAborting,
+    JobCancelled,
+    JobFailed,
+    JobNotFound,
+    JobRejected,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -27,12 +33,12 @@ default_timeout = 5
 job_states = {
     "todo": ["pending"],
     "doing": ["running", "aborting"],
-    "done": ["done", "failed", "cancelled"]
+    "done": ["done", "failed", "cancelled"],
 }
 commands = ["execute"]
 
 
-class Job():
+class Job:
     """Job metadata class."""
 
     def __init__(
@@ -63,10 +69,15 @@ class Job():
 
     def progress(self, wait_for_max=None, raise_exc=True, interval=0.3):
         """Yield job progress messages."""
-        yield from self._client.job_progress(self.job_id, wait_for_max=wait_for_max, raise_exc=raise_exc, interval=interval)
+        yield from self._client.job_progress(
+            self.job_id,
+            wait_for_max=wait_for_max,
+            raise_exc=raise_exc,
+            interval=interval,
+        )
 
 
-class Client():
+class Client:
     """Client class which abstracts REST interface."""
 
     def __init__(
@@ -76,7 +87,7 @@ class Client():
         user=None,
         password=None,
         _test_client=None,
-        **kwargs
+        **kwargs,
     ):
         """Initialize."""
         env_host = os.environ.get("MHUB_HOST")
@@ -113,7 +124,6 @@ class Client():
         except ConnectionError:  # pragma: no cover
             raise ConnectionError(f"no mhub server found at {self.host}")
 
-
     def get(self, url, **kwargs):
         """Make a GET request to _test_client or host."""
         return self._request("GET", url, **kwargs)
@@ -126,13 +136,7 @@ class Client():
         """Make a DELETE request to _test_client or host."""
         return self._request("DELETE", url, **kwargs)
 
-    def start_job(
-        self,
-        command="execute",
-        config=None,
-        params=None,
-        basedir=None
-    ):
+    def start_job(self, command="execute", config=None, params=None, basedir=None):
         """
         Start a job and return job state.
 
@@ -170,7 +174,7 @@ class Client():
         job = OrderedDict(
             command=command,
             config=load_mapchete_config(config, basedir),
-            params=params or {}
+            params=params or {},
         )
 
         # make sure correct command is provided
@@ -179,9 +183,7 @@ class Client():
 
         logger.debug(f"send job to API")
         res = self.post(
-            f"processes/{command}/execution",
-            data=json.dumps(job),
-            timeout=self.timeout
+            f"processes/{command}/execution", data=json.dumps(job), timeout=self.timeout
         )
 
         if res.status_code != 201:
@@ -194,15 +196,12 @@ class Client():
                 state=res.json()["properties"]["state"],
                 job_id=job_id,
                 json=res.json(),
-                _client=self
+                _client=self,
             )
 
     def cancel_job(self, job_id):
         """Cancel existing job."""
-        res = self.delete(
-            f"jobs/{job_id}",
-            timeout=self.timeout
-        )
+        res = self.delete(f"jobs/{job_id}", timeout=self.timeout)
         if res.status_code == 404:
             raise JobNotFound(f"job {job_id} does not exist")
         return Job(
@@ -210,7 +209,7 @@ class Client():
             state=self.job_state(job_id),
             job_id=job_id,
             json=res.json(),
-            _client=self
+            _client=self,
         )
 
     def retry_job(self, job_id):
@@ -228,7 +227,7 @@ class Client():
         return self.start_job(
             config=existing_job.to_dict()["properties"]["mapchete"]["config"],
             command=existing_job.to_dict()["properties"]["mapchete"]["command"],
-            params=existing_job.to_dict()["properties"]["mapchete"]["params"]
+            params=existing_job.to_dict()["properties"]["mapchete"]["params"],
         )
 
     def job(self, job_id, geojson=False, indent=4):
@@ -245,7 +244,7 @@ class Client():
                     state=res.json()["properties"]["state"],
                     job_id=job_id,
                     json=res.json(),
-                    _client=self
+                    _client=self,
                 )
             )
 
@@ -258,10 +257,7 @@ class Client():
         res = self.get(
             "jobs",
             timeout=self.timeout,
-            params=dict(
-                kwargs,
-                bounds=",".join(map(str, bounds)) if bounds else None
-            )
+            params=dict(kwargs, bounds=",".join(map(str, bounds)) if bounds else None),
         )
         if res.status_code != 200:  # pragma: no cover
             raise Exception(res.json())
@@ -274,7 +270,7 @@ class Client():
                     state=job["properties"]["state"],
                     job_id=job["id"],
                     json=job,
-                    _client=self
+                    _client=self,
                 )
                 for job in res.json()["features"]
             }
@@ -285,8 +281,7 @@ class Client():
         return {
             job_id: job.state
             for job_id, job in self.jobs(
-                timeout=self.timeout,
-                output_path=output_path
+                timeout=self.timeout, output_path=output_path
             ).items()
         }
 
@@ -296,8 +291,12 @@ class Client():
         last_progress = 0
         while True:
             job = self.job(job_id)
-            if wait_for_max is not None and time.time() - start > wait_for_max:  # pragma: no cover
-                raise RuntimeError(f"job not done in time, last state was '{job.state}'")
+            if (
+                wait_for_max is not None and time.time() - start > wait_for_max
+            ):  # pragma: no cover
+                raise RuntimeError(
+                    f"job not done in time, last state was '{job.state}'"
+                )
             properties = job.to_dict()["properties"]
             if job.state == "pending":  # pragma: no cover
                 continue
@@ -307,7 +306,7 @@ class Client():
                     yield dict(
                         state=job.state,
                         current_progress=current_progress,
-                        total_progress=properties["total_progress"]
+                        total_progress=properties["total_progress"],
                     )
                     last_progress = current_progress
             elif job.state == "aborting":
@@ -328,19 +327,16 @@ class Client():
             elif job.state == "done":
                 current_progress = properties.get("current_progress")
                 total_progress = properties.get("total_progress")
-                if (
-                    current_progress is not None and total_progress is not None
-                ) and (
+                if (current_progress is not None and total_progress is not None) and (
                     current_progress == total_progress
                 ):
                     yield dict(
                         state=job.state,
                         current_progress=current_progress,
-                        total_progress=total_progress
+                        total_progress=total_progress,
                     )
                 return
             time.sleep(interval)
-
 
     def _get_kwargs(self, kwargs):
         """
@@ -351,10 +347,7 @@ class Client():
         """
         if self._test_client:  # pragma: no cover
             kwargs.pop("timeout", None)
-        return dict(
-            kwargs,
-            auth=(self._user, self._password)
-        )
+        return dict(kwargs, auth=(self._user, self._password))
 
 
 def load_mapchete_config(mapchete_config, basedir=None):
@@ -396,10 +389,7 @@ def load_mapchete_config(mapchete_config, basedir=None):
     if isinstance(process, str):
         # local python file
         if conf.get("process").endswith(".py"):
-            custom_process_path = os.path.join(
-                basedir,
-                conf.get("process")
-            )
+            custom_process_path = os.path.join(basedir, conf.get("process"))
             # check syntax
             py_compile.compile(custom_process_path, doraise=True)
             # assert file is not empty
@@ -414,7 +404,10 @@ def load_mapchete_config(mapchete_config, basedir=None):
 def cleanup_datetime(d):
     """Convert datetime objects in dictionary to strings."""
     return OrderedDict(
-        (k, cleanup_datetime(v)) if isinstance(v, dict)
-        else (k, str(v)) if isinstance(v, datetime.date) else (k, v)
+        (k, cleanup_datetime(v))
+        if isinstance(v, dict)
+        else (k, str(v))
+        if isinstance(v, datetime.date)
+        else (k, v)
         for k, v in d.items()
     )

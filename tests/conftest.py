@@ -21,10 +21,8 @@ def fake_backend_db():
 
 
 def local_dask_cluster():
-    return {
-        "flavor" : "local_cluster",
-        "cluster": _dask_cluster
-    }
+    return {"flavor": "local_cluster", "cluster": _dask_cluster}
+
 
 app.dependency_overrides[get_backend_db] = fake_backend_db
 app.dependency_overrides[get_dask] = local_dask_cluster
@@ -47,15 +45,18 @@ def mhub_integration_client():
 
 @pytest.fixture
 def cli():
-    class CLI():
-
+    class CLI:
         def __init__(self, cli_func):
             self.cli_func = cli_func
 
         def run(self, command):
             return CliRunner().invoke(
                 self.cli_func,
-                ["--host", os.environ.get("MHUB_HOST", "http://0.0.0.0:5000"), *command.split(" ")]
+                [
+                    "--host",
+                    os.environ.get("MHUB_HOST", "http://0.0.0.0:5000"),
+                    *command.split(" "),
+                ],
             )
 
     return CLI(mhub)
@@ -70,10 +71,7 @@ def test_process_id():
 def example_config_json(tmpdir):
     return {
         "command": "execute",
-        "params": {
-            "zoom": 5,
-            "bounds": [0, 1, 2, 3]
-        },
+        "params": {"zoom": 5, "bounds": [0, 1, 2, 3]},
         "config": {
             "process": "mapchete.processes.convert",
             "input": {
@@ -83,17 +81,11 @@ def example_config_json(tmpdir):
                 "format": "GTiff",
                 "bands": 1,
                 "dtype": "uint16",
-                "path": str(tmpdir)
+                "path": str(tmpdir),
             },
-            "pyramid": {
-                "grid": "geodetic",
-                "metatiling": 2
-            },
-            "zoom_levels": {
-                "min": 0,
-                "max": 13
-            }
-        }
+            "pyramid": {"grid": "geodetic", "metatiling": 2},
+            "zoom_levels": {"min": 0, "max": 13},
+        },
     }
 
 
@@ -101,16 +93,12 @@ def example_config_json(tmpdir):
 def example_config_custom_process_json(tmpdir):
     return {
         "command": "execute",
-        "params": {
-            "zoom": 8,
-            "bounds": [0, 1, 2, 3]
-        },
+        "params": {"zoom": 8, "bounds": [0, 1, 2, 3]},
         "config": {
             "process": [
                 "def execute(mp):",
                 "    with mp.open('inp') as inp:",
                 "        return inp.read()",
-
             ],
             "input": {
                 "inp": "https://ungarj.github.io/mapchete_testdata/tiled_data/raster/cleantopo/"
@@ -119,17 +107,11 @@ def example_config_custom_process_json(tmpdir):
                 "format": "GTiff",
                 "bands": 1,
                 "dtype": "uint16",
-                "path": str(tmpdir)
+                "path": str(tmpdir),
             },
-            "pyramid": {
-                "grid": "geodetic",
-                "metatiling": 2
-            },
-            "zoom_levels": {
-                "min": 0,
-                "max": 13
-            }
-        }
+            "pyramid": {"grid": "geodetic", "metatiling": 2},
+            "zoom_levels": {"min": 0, "max": 13},
+        },
     }
 
 
@@ -137,10 +119,7 @@ def example_config_custom_process_json(tmpdir):
 def example_config_python_process_json(tmpdir):
     return {
         "command": "execute",
-        "params": {
-            "zoom": 8,
-            "bounds": [0, 1, 2, 3]
-        },
+        "params": {"zoom": 8, "bounds": [0, 1, 2, 3]},
         "config": {
             "process": "example.py",
             "input": {
@@ -150,54 +129,11 @@ def example_config_python_process_json(tmpdir):
                 "format": "GTiff",
                 "bands": 1,
                 "dtype": "uint16",
-                "path": str(tmpdir)
+                "path": str(tmpdir),
             },
-            "pyramid": {
-                "grid": "geodetic",
-                "metatiling": 2
-            },
-            "zoom_levels": {
-                "min": 0,
-                "max": 13
-            }
-        }
-    }
-
-
-
-@pytest.fixture
-def example_config_custom_process_json(tmpdir):
-    return {
-        "command": "execute",
-        "params": {
-            "zoom": 8,
-            "bounds": [0, 1, 2, 3]
+            "pyramid": {"grid": "geodetic", "metatiling": 2},
+            "zoom_levels": {"min": 0, "max": 13},
         },
-        "config": {
-            "process": [
-                "def execute(mp):",
-                "    with mp.open('inp') as inp:",
-                "        return inp.read()",
-
-            ],
-            "input": {
-                "inp": "https://ungarj.github.io/mapchete_testdata/tiled_data/raster/cleantopo/"
-            },
-            "output": {
-                "format": "GTiff",
-                "bands": 1,
-                "dtype": "uint16",
-                "path": str(tmpdir)
-            },
-            "pyramid": {
-                "grid": "geodetic",
-                "metatiling": 2
-            },
-            "zoom_levels": {
-                "min": 0,
-                "max": 13
-            }
-        }
     }
 
 
@@ -205,10 +141,7 @@ def example_config_custom_process_json(tmpdir):
 def example_config_process_exception_json(tmpdir):
     return {
         "command": "execute",
-        "params": {
-            "zoom": 8,
-            "bounds": [0, 1, 2, 3]
-        },
+        "params": {"zoom": 8, "bounds": [0, 1, 2, 3]},
         "config": {
             "process": [
                 "def execute(mp):",
@@ -221,17 +154,11 @@ def example_config_process_exception_json(tmpdir):
                 "format": "GTiff",
                 "bands": 1,
                 "dtype": "uint16",
-                "path": str(tmpdir)
+                "path": str(tmpdir),
             },
-            "pyramid": {
-                "grid": "geodetic",
-                "metatiling": 2
-            },
-            "zoom_levels": {
-                "min": 0,
-                "max": 13
-            }
-        }
+            "pyramid": {"grid": "geodetic", "metatiling": 2},
+            "zoom_levels": {"min": 0, "max": 13},
+        },
     }
 
 
