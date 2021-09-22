@@ -66,8 +66,8 @@ class Job():
         yield from self._api.job_progress(self.job_id, wait_for_max=wait_for_max, raise_exc=raise_exc, interval=interval)
 
 
-class API():
-    """API class which abstracts REST interface."""
+class Client():
+    """Client class which abstracts REST interface."""
 
     def __init__(
         self,
@@ -315,10 +315,10 @@ class API():
                     raise JobAborting(f"job {job_id} aborting")
                 else:
                     return
-            elif job.state == "cancelled":
+            elif job.state == "cancelled":  # pragma: no cover
                 if raise_exc:
                     raise JobCancelled(f"job {job_id} cancelled")
-                else:  # pragma: no cover
+                else:
                     return
             elif job.state == "failed":
                 if raise_exc:

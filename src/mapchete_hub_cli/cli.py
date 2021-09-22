@@ -5,7 +5,7 @@ from itertools import chain
 import logging
 from tqdm import tqdm
 
-from mapchete_hub_cli import API, commands, default_timeout, job_states, __version__
+from mapchete_hub_cli import Client, commands, default_timeout, job_states, __version__
 from mapchete_hub_cli.exceptions import JobFailed
 from mapchete_hub_cli.log import set_log_level
 
@@ -23,7 +23,7 @@ def _set_debug_log_level(ctx, param, debug):
 
 
 def _check_worker_specs(ctx, param, worker_specs):
-    res = API(**ctx.obj).get("worker_specs")
+    res = Client(**ctx.obj).get("worker_specs")
     if res.status_code != 200:  # pragma: no cover
         raise ConnectionError(res.json())
     for w in res.json().keys():
@@ -309,7 +309,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
         )
 
         if job_ids:
-            jobs = [API(**ctx.obj).job(job_id) for job_id in job_ids]
+            jobs = [Client(**ctx.obj).job(job_id) for job_id in job_ids]
 
         else:
             if all([v is None for v in kwargs.values()]):  # pragma: no cover
@@ -317,7 +317,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
                 raise click.UsageError(
                     "Please either provide one or more job IDs or other search values."
                 )
-            jobs = API(**ctx.obj).jobs(**kwargs).values()
+            jobs = Client(**ctx.obj).jobs(**kwargs).values()
 
         def _yield_revokable_jobs(jobs):
             for j in jobs:
@@ -336,7 +336,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
             click.echo(job_id)
         if force or click.confirm(f"Do you really want to cancel {len(job_ids)} job(s)?", abort=True):
             for job_id in job_ids:
-                job = API(**ctx.obj).cancel_job(job_id)
+                job = Client(**ctx.obj).cancel_job(job_id)
                 logger.debug(job.to_dict())
                 click.echo(f"job {job.state}")
 
@@ -369,7 +369,7 @@ def execute(
     """Execute a process."""
     for mapchete_file in mapchete_files:
         try:
-            job = API(**ctx.obj).start_job(
+            job = Client(**ctx.obj).start_job(
                 command="execute",
                 config=mapchete_file,
                 params=dict(
@@ -400,7 +400,7 @@ def execute(
 def job(ctx, job_id, geojson=False, traceback=False, progress=False, debug=False, **kwargs):
     """Show job status."""
     try:
-        job = API(**ctx.obj).job(job_id, geojson=geojson)
+        job = Client(**ctx.obj).job(job_id, geojson=geojson)
         if geojson:  # pragma: no cover
             click.echo(job)
             return
@@ -466,11 +466,11 @@ def jobs(
     try:
         if geojson:
             click.echo(
-                API(**ctx.obj).jobs(geojson=True, **kwargs)
+                Client(**ctx.obj).jobs(geojson=True, **kwargs)
             )
         else:
             # sort by state and then by timestamp
-            jobs = _sort_jobs(API(**ctx.obj).jobs(**kwargs).values(), sort_by=sort_by)
+            jobs = _sort_jobs(Client(**ctx.obj).jobs(**kwargs).values(), sort_by=sort_by)
             logger.debug(jobs)
             if verbose:
                 click.echo(f"{len(jobs)} jobs found. \n")
@@ -504,7 +504,7 @@ def processes(ctx, process_name=None, docstrings=False, **kwargs):
             click.echo(process_module["description"])
 
     try:
-        res = API(**ctx.obj).get("processes")
+        res = Client(**ctx.obj).get("processes")
         if res.status_code != 200:  # pragma: no cover
             raise ConnectionError(res.json())
 
@@ -530,7 +530,7 @@ def processes(ctx, process_name=None, docstrings=False, **kwargs):
 @opt_debug
 @click.pass_context
 def worker_specs(ctx, **kwargs):
-    res = API(**ctx.obj).get("worker_specs")
+    res = Client(**ctx.obj).get("worker_specs")
     if res.status_code != 200:  # pragma: no cover
         raise ConnectionError(res.json())
     click.echo(json.dumps(res.json(), indent=4, sort_keys=True))
@@ -567,7 +567,7 @@ def retry(
 
     try:
         if job_ids:
-            jobs = [API(**ctx.obj).job(job_id) for job_id in job_ids]
+            jobs = [Client(**ctx.obj).job(job_id) for job_id in job_ids]
 
         else:
             if all([v is None for v in kwargs.values()]):  # pragma: no cover
@@ -575,7 +575,7 @@ def retry(
                 raise click.UsageError(
                     "Please either provide one or more job IDs or other search values."
                 )
-            jobs = API(**ctx.obj).jobs(**kwargs).values()
+            jobs = Client(**ctx.obj).jobs(**kwargs).values()
 
         def _yield_retryable_jobs(jobs):
             for j in jobs:
@@ -594,7 +594,7 @@ def retry(
             click.echo(job_id)
         if force or click.confirm(f"Do you really want to retry {len(job_ids)} job(s)?", abort=True):
             for job_id in job_ids:
-                job = API(**ctx.obj).retry_job(job_id)
+                job = Client(**ctx.obj).retry_job(job_id)
                 click.echo(f"job {job.state}")
     except Exception as e:  # pragma: no cover
         if debug:
@@ -686,7 +686,7 @@ def _print_job_details(job, verbose=False):
 
 def _show_progress(ctx, job_id, disable=False):
     try:
-        progress = API(**ctx.obj).job(job_id).progress()
+        progress = Client(**ctx.obj).job(job_id).progress()
         click.echo("wait for job progress...")
         i = next(progress)
         last_progress = i["current_progress"]
