@@ -79,6 +79,7 @@ class API():
         **kwargs
     ):
         """Initialize."""
+        host = os.environ.get("MHUB_HOST", host)
         host = host if host.startswith("http") else f"http://{host}"
         host = host if host.endswith("/") else f"{host}/"
         self.host = host if host.endswith("/") else f"{host}/"
