@@ -2,7 +2,7 @@
 Changelog
 #########
 
------------------
-0.20 - 2021-08-15
------------------
-    * first version only supporting mapchete Hub 0.20
+----------------
+0.1 - 2021-09-22
+----------------
+    * first version supporting mapchete Hub 0.20
