@@ -22,13 +22,13 @@ def _set_debug_log_level(ctx, param, debug):
     return debug
 
 
-def _check_worker_specs(ctx, param, worker_specs):
-    res = Client(**ctx.obj).get("worker_specs")
+def _check_dask_specs(ctx, param, dask_specs):
+    res = Client(**ctx.obj).get("dask_specs")
     if res.status_code != 200:  # pragma: no cover
         raise ConnectionError(res.json())
     for w in res.json().keys():
-        if worker_specs not in res.json().keys():
-            raise TypeError(f"Worker specs name not in {res.json().keys()}!!!")
+        if dask_specs not in res.json().keys():
+            raise TypeError(f"Dask specs name not in {res.json().keys()}!!!")
 
 
 def _get_timestamp(ctx, param, timestamp):
@@ -203,10 +203,10 @@ opt_command = click.option(
     type=click.Choice(commands),
     help="Filter jobs by command."
 )
-opt_worker_specs = click.option(
-    "--worker_specs", "-w",
+opt_dask_specs = click.option(
+    "--dask_specs", "-w",
     type=click.STRING,
-    callback=_check_worker_specs,
+    callback=_check_dask_specs,
     default="default",
     help="Choose worker performance class."
 )
@@ -354,7 +354,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
 @opt_tile
 @opt_overwrite
 @opt_verbose
-@opt_worker_specs
+@opt_dask_specs
 @opt_debug
 @opt_job_name
 @click.pass_context
@@ -529,8 +529,8 @@ def processes(ctx, process_name=None, docstrings=False, **kwargs):
 @mhub.command(short_help="Show available worker specs.")
 @opt_debug
 @click.pass_context
-def worker_specs(ctx, **kwargs):
-    res = Client(**ctx.obj).get("worker_specs")
+def dask_specs(ctx, **kwargs):
+    res = Client(**ctx.obj).get("dask_specs")
     if res.status_code != 200:  # pragma: no cover
         raise ConnectionError(res.json())
     click.echo(json.dumps(res.json(), indent=4, sort_keys=True))
