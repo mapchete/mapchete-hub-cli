@@ -36,7 +36,7 @@ class Job():
     """Job metadata class."""
 
     def __init__(
-        self, status_code=None, state=None, job_id=None, json=None, _api=None
+        self, status_code=None, state=None, job_id=None, json=None, _client=None
     ):
         """Initialize."""
         self.status_code = status_code
@@ -45,7 +45,7 @@ class Job():
         self.exists = True if status_code == 409 else False
         self._dict = OrderedDict(json.items())
         self.__geo_interface__ = self._dict["geometry"]
-        self._api = _api
+        self._client = _client
 
     def to_dict(self):
         return self._dict
@@ -63,7 +63,7 @@ class Job():
 
     def progress(self, wait_for_max=None, raise_exc=True, interval=0.3):
         """Yield job progress messages."""
-        yield from self._api.job_progress(self.job_id, wait_for_max=wait_for_max, raise_exc=raise_exc, interval=interval)
+        yield from self._client.job_progress(self.job_id, wait_for_max=wait_for_max, raise_exc=raise_exc, interval=interval)
 
 
 class Client():
@@ -91,15 +91,15 @@ class Client():
         self._user = user
         self._password = password
         self._test_client = _test_client
-        self._api = _test_client if _test_client else requests
+        self._client = _test_client if _test_client else requests
         self._baseurl = "" if _test_client else host
 
     def _request(self, request_type, url, **kwargs):
         _request_func = {
-            "GET": self._api.get,
-            "POST": self._api.post,
-            "PUT": self._api.put,
-            "DELETE": self._api.delete,
+            "GET": self._client.get,
+            "POST": self._client.post,
+            "PUT": self._client.put,
+            "DELETE": self._client.delete,
         }
         if request_type not in _request_func:  # pragma: no cover
             raise ValueError(f"unknown request type '{request_type}'")
@@ -194,7 +194,7 @@ class Client():
                 state=res.json()["properties"]["state"],
                 job_id=job_id,
                 json=res.json(),
-                _api=self
+                _client=self
             )
 
     def cancel_job(self, job_id):
@@ -210,7 +210,7 @@ class Client():
             state=self.job_state(job_id),
             job_id=job_id,
             json=res.json(),
-            _api=self
+            _client=self
         )
 
     def retry_job(self, job_id):
@@ -245,7 +245,7 @@ class Client():
                     state=res.json()["properties"]["state"],
                     job_id=job_id,
                     json=res.json(),
-                    _api=self
+                    _client=self
                 )
             )
 
@@ -274,7 +274,7 @@ class Client():
                     state=job["properties"]["state"],
                     job_id=job["id"],
                     json=job,
-                    _api=self
+                    _client=self
                 )
                 for job in res.json()["features"]
             }
