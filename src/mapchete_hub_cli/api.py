@@ -17,7 +17,7 @@ import time
 import uuid
 import oyaml as yaml
 
-from mapchete_hub_cli.exceptions import JobCancelled, JobFailed, JobNotFound, JobRejected
+from mapchete_hub_cli.exceptions import JobAborting, JobCancelled, JobFailed, JobNotFound, JobRejected
 
 
 logger = logging.getLogger(__name__)
@@ -55,9 +55,9 @@ class Job():
         """Block until job has finished processing."""
         list(self.progress(wait_for_max=wait_for_max, raise_exc=raise_exc))
 
-    def progress(self, wait_for_max=None, raise_exc=True):
+    def progress(self, wait_for_max=None, raise_exc=True, interval=0.3):
         """Yield job progress messages."""
-        yield from self._api.job_progress(self.job_id, wait_for_max=wait_for_max, raise_exc=raise_exc)
+        yield from self._api.job_progress(self.job_id, wait_for_max=wait_for_max, raise_exc=raise_exc, interval=interval)
 
 
 class API():
@@ -284,14 +284,13 @@ class API():
         start = time.time()
         last_progress = 0
         while True:
-            if wait_for_max is not None and time.time() - start > wait_for_max:  # pragma: no cover
-                raise RuntimeError(f"job not done in time, last state was '{state}'")
-            time.sleep(interval)
             job = self.job(job_id)
+            if wait_for_max is not None and time.time() - start > wait_for_max:  # pragma: no cover
+                raise RuntimeError(f"job not done in time, last state was '{job.state}'")
             properties = job.json["properties"]
             if job.state == "pending":  # pragma: no cover
                 continue
-            elif job.state in ["aborting", "running"] and properties.get("total_progress"):
+            elif job.state == "running" and properties.get("total_progress"):
                 current_progress = properties["current_progress"]
                 if current_progress > last_progress:
                     yield dict(
@@ -300,6 +299,11 @@ class API():
                         total_progress=properties["total_progress"]
                     )
                     last_progress = current_progress
+            elif job.state == "aborting":
+                if raise_exc:
+                    raise JobAborting(f"job {job_id} aborting")
+                else:
+                    return
             elif job.state == "cancelled":
                 if raise_exc:
                     raise JobCancelled(f"job {job_id} cancelled")
@@ -324,6 +328,7 @@ class API():
                         total_progress=total_progress
                     )
                 return
+            time.sleep(interval)
 
 
     def _get_kwargs(self, kwargs):

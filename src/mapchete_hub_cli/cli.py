@@ -642,6 +642,9 @@ def _print_job_details(job, verbose=False):
         # state
         click.echo(click.style(f"state: {job.state}"))
 
+        # exception
+        click.echo(click.style(f"exception: {properties.get('exception')}"))
+
         # progress
         current = properties.get("current_progress")
         total = properties.get("total_progress")
@@ -686,8 +689,13 @@ def _show_progress(ctx, job_id, disable=False):
         progress = API(**ctx.obj).job(job_id).progress()
         click.echo("wait for job progress...")
         i = next(progress)
-        last_progress = 0
-        with tqdm(total=i["total_progress"], disable=disable) as pbar:
+        last_progress = i["current_progress"]
+        with tqdm(
+            total=i["total_progress"],
+            initial=last_progress,
+            disable=disable,
+            unit="task"
+        ) as pbar:
             for i in progress:
                 current_progress = i["current_progress"]
                 pbar.update(current_progress - last_progress)
@@ -697,4 +705,4 @@ def _show_progress(ctx, job_id, disable=False):
         click.echo(f"Job {job_id} failed: {e}")
         return
     except Exception as e:  # pragma: no cover
-        raise click.ClickException(e)
+        raise click.ClickException(str(e))

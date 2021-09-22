@@ -18,5 +18,9 @@ class JobRejected(Exception):
     """Raise if job is rejected from server."""
 
 
+class JobAborting(Exception):
+    """Raise if job is cancelled."""
+
+
 class JobCancelled(Exception):
     """Raise if job is cancelled."""
