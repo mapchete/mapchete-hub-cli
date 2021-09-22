@@ -6,7 +6,7 @@ import requests
 from shapely.geometry import shape
 import time
 
-from mapchete_hub_cli.exceptions import JobCancelled
+from mapchete_hub_cli.exceptions import JobAborting, JobCancelled
 
 TEST_ENDPOINT = os.environ.get("MHUB_HOST", "http://0.0.0.0:5000")
 
@@ -36,10 +36,10 @@ def test_cancel_job(mhub_integration_api, example_config_json):
     job = mhub_integration_api.start_job(**example_config_json)
     job = mhub_integration_api.cancel_job(job.job_id)
     assert job.status_code == 200
-    with pytest.raises(JobCancelled):
+    with pytest.raises((JobAborting, JobCancelled)):
         job.wait(wait_for_max=120)
     job = mhub_integration_api.job(job.job_id)
-    assert job.state == "cancelled"
+    assert job.state in ["cancelled", "aborting"]
 
 @pytest.mark.skipif(not ENDPOINT_AVAILABLE, reason="requires up and running endpoint using docker-compose")
 def test_retry_job(mhub_integration_api, example_config_json):
@@ -56,8 +56,8 @@ def test_job(mhub_integration_api, example_config_json):
     job = mhub_integration_api.job(job.job_id)
     assert job.status_code == 200
     assert job.state == "running"
-    assert job.json
-    assert isinstance(job.json, dict)
+    assert job.to_dict()
+    assert isinstance(job.to_dict(), dict)
 
 
 @pytest.mark.skipif(not ENDPOINT_AVAILABLE, reason="requires up and running endpoint using docker-compose")

@@ -74,8 +74,8 @@ def test_job(mhub_api, example_config_json):
     job = mhub_api.job(job.job_id)
     assert job.status_code == 200
     assert job.state == "done"
-    assert job.json
-    assert isinstance(job.json, dict)
+    assert job.to_dict()
+    assert isinstance(job.to_dict(), dict)
 
 
 def test_job_state(mhub_api, example_config_json):

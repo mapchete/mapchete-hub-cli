@@ -17,7 +17,7 @@ import time
 import uuid
 import oyaml as yaml
 
-from mapchete_hub_cli.exceptions import JobCancelled, JobFailed, JobNotFound, JobRejected
+from mapchete_hub_cli.exceptions import JobAborting, JobCancelled, JobFailed, JobNotFound, JobRejected
 
 
 logger = logging.getLogger(__name__)
@@ -43,21 +43,27 @@ class Job():
         self.state = state
         self.job_id = job_id
         self.exists = True if status_code == 409 else False
-        self.json = OrderedDict(json.items())
-        self.__geo_interface__ = self.json["geometry"]
+        self._dict = OrderedDict(json.items())
+        self.__geo_interface__ = self._dict["geometry"]
         self._api = _api
+
+    def to_dict(self):
+        return self._dict
+
+    def to_json(self, indent=4):
+        return json.dumps(self._dict, indent=indent)
 
     def __repr__(self):  # pragma: no cover
         """Print Job."""
-        return f"Job(status_code={self.status_code}, state={self.state}, job_id={self.job_id}, json={self.json}"
+        return f"Job(status_code={self.status_code}, state={self.state}, job_id={self.job_id}, dict={self.to_dict()}"
 
     def wait(self, wait_for_max=None, raise_exc=True):
         """Block until job has finished processing."""
         list(self.progress(wait_for_max=wait_for_max, raise_exc=raise_exc))
 
-    def progress(self, wait_for_max=None, raise_exc=True):
+    def progress(self, wait_for_max=None, raise_exc=True, interval=0.3):
         """Yield job progress messages."""
-        yield from self._api.job_progress(self.job_id, wait_for_max=wait_for_max, raise_exc=raise_exc)
+        yield from self._api.job_progress(self.job_id, wait_for_max=wait_for_max, raise_exc=raise_exc, interval=interval)
 
 
 class API():
@@ -73,9 +79,14 @@ class API():
         **kwargs
     ):
         """Initialize."""
+        env_host = os.environ.get("MHUB_HOST")
+        if env_host:
+            logger.debug(f"got mhub host from env: {env_host}")
+            host = env_host
         host = host if host.startswith("http") else f"http://{host}"
         host = host if host.endswith("/") else f"{host}/"
         self.host = host if host.endswith("/") else f"{host}/"
+        logger.debug(f"use host name {self.host}")
         self.timeout = timeout or default_timeout
         self._user = user
         self._password = password
@@ -215,9 +226,9 @@ class API():
         """
         existing_job = self.job(job_id)
         return self.start_job(
-            config=existing_job.json["properties"]["mapchete"]["config"],
-            command=existing_job.json["properties"]["mapchete"]["command"],
-            params=existing_job.json["properties"]["mapchete"]["params"]
+            config=existing_job.to_dict()["properties"]["mapchete"]["config"],
+            command=existing_job.to_dict()["properties"]["mapchete"]["command"],
+            params=existing_job.to_dict()["properties"]["mapchete"]["params"]
         )
 
     def job(self, job_id, geojson=False, indent=4):
@@ -284,14 +295,13 @@ class API():
         start = time.time()
         last_progress = 0
         while True:
-            if wait_for_max is not None and time.time() - start > wait_for_max:  # pragma: no cover
-                raise RuntimeError(f"job not done in time, last state was '{state}'")
-            time.sleep(interval)
             job = self.job(job_id)
-            properties = job.json["properties"]
+            if wait_for_max is not None and time.time() - start > wait_for_max:  # pragma: no cover
+                raise RuntimeError(f"job not done in time, last state was '{job.state}'")
+            properties = job.to_dict()["properties"]
             if job.state == "pending":  # pragma: no cover
                 continue
-            elif job.state in ["aborting", "running"] and properties.get("total_progress"):
+            elif job.state == "running" and properties.get("total_progress"):
                 current_progress = properties["current_progress"]
                 if current_progress > last_progress:
                     yield dict(
@@ -300,6 +310,11 @@ class API():
                         total_progress=properties["total_progress"]
                     )
                     last_progress = current_progress
+            elif job.state == "aborting":
+                if raise_exc:
+                    raise JobAborting(f"job {job_id} aborting")
+                else:
+                    return
             elif job.state == "cancelled":
                 if raise_exc:
                     raise JobCancelled(f"job {job_id} cancelled")
@@ -324,6 +339,7 @@ class API():
                         total_progress=total_progress
                     )
                 return
+            time.sleep(interval)
 
 
     def _get_kwargs(self, kwargs):

@@ -16,7 +16,7 @@ services:
     command: ["--bind_ip_all"]
 
   server:
-    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:fastapi_dask
+    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:0.20
     depends_on:
       - dask_scheduler
       - db
@@ -25,18 +25,17 @@ services:
       - MHUB_MONGODB_URL=mongodb://mhub:uu9ieTh1@db:27017
     networks:
       - backend
-    ports:
-      - ${MHUB_PORT:-5000}:5000
-    command: ["uvicorn", "mapchete_hub.app:app", "--host", "0.0.0.0", "--port", "5000", "--log-level", "debug"]
+      - frontend
+    command: ["uvicorn", "mapchete_hub.app:app", "--host", "0.0.0.0", "--port", "${MHUB_PORT:-5000}", "--log-level", "debug"]
 
   dask_scheduler:
-    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:fastapi_dask
+    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:0.20
     networks:
       - backend
     command: ["dask-scheduler", "--host", "dask_scheduler", "--port", "8786"]
 
   dask_worker:
-    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:fastapi_dask
+    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:0.20
     depends_on:
       - dask_scheduler
     networks:
@@ -48,3 +47,4 @@ volumes:
 
 networks:
   backend:
+  frontend:
