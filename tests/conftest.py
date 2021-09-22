@@ -9,7 +9,7 @@ from mapchete_hub.db import BackendDB
 import mongomock.database
 import yaml
 
-from mapchete_hub_cli import API
+from mapchete_hub_cli import Client
 from mapchete_hub_cli.cli import mhub
 
 _fake_backend_db = BackendDB(mongomock.MongoClient())
@@ -36,13 +36,13 @@ def client():
 
 
 @pytest.fixture(scope="session")
-def mhub_api(client):
-    return API(_test_client=client)
+def mhub_client(client):
+    return Client(_test_client=client)
 
 
 @pytest.fixture
-def mhub_integration_api():
-    return API(os.environ.get("MHUB_HOST", "http://0.0.0.0:5000"))
+def mhub_integration_client():
+    return Client(os.environ.get("MHUB_HOST", "http://0.0.0.0:5000"))
 
 
 @pytest.fixture
