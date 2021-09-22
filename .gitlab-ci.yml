@@ -1,3 +1,5 @@
+image: docker/compose:1.26.0
+
 stages:
   - build
   - test
