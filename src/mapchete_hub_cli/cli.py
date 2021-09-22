@@ -33,6 +33,7 @@ def _check_dask_specs(ctx, param, dask_specs):
 
 def _get_timestamp(ctx, param, timestamp):
     """Convert timestamp to datetime object."""
+
     def str_to_date(date_str):
         """Convert string to datetime object."""
         if "T" in date_str:
@@ -42,14 +43,14 @@ def _get_timestamp(ctx, param, timestamp):
             except ValueError:
                 return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S" + add_zulu)
         else:
-            return datetime(*map(int, date_str.split('-')))
-
+            return datetime(*map(int, date_str.split("-")))
 
     def date_to_str(date_obj, microseconds=True):
         """Return string from datetime object in the format."""
         return date_obj.strftime(
             "%Y-%m-%dT%H:%M:%S.%fZ" if microseconds else "%Y-%m-%dT%H:%M:%SZ"
         )
+
     if timestamp:
         try:
             # for a convertable timestamp like '2019-11-01T15:00:00'
@@ -168,60 +169,51 @@ opt_progress = click.option(
     "--progress", is_flag=True, help="Show progress in progress bar."
 )
 opt_debug = click.option(
-    "--debug", "-d",
+    "--debug",
+    "-d",
     is_flag=True,
     callback=_set_debug_log_level,
-    help="Print debug log output."
+    help="Print debug log output.",
 )
-opt_job_name = click.option(
-    "--job-name",
-    type=click.STRING,
-    help="Name of job."
-)
-opt_geojson = click.option(
-    "--geojson", "-g",
-    is_flag=True,
-    help="Print as GeoJSON."
-)
+opt_job_name = click.option("--job-name", type=click.STRING, help="Name of job.")
+opt_geojson = click.option("--geojson", "-g", is_flag=True, help="Print as GeoJSON.")
 opt_output_path = click.option(
-    "--output-path", "-p",
-    type=click.STRING,
-    help="Filter jobs by output_path."
+    "--output-path", "-p", type=click.STRING, help="Filter jobs by output_path."
 )
 opt_state = click.option(
-    "--state", "-s",
+    "--state",
+    "-s",
     type=click.Choice(
         (
-            [s.lower() for s in job_states.keys()] +
-            [s.lower() for s in chain(*[g for g in job_states.values()])]
+            [s.lower() for s in job_states.keys()]
+            + [s.lower() for s in chain(*[g for g in job_states.values()])]
         )
     ),
-    help="Filter jobs by job state."
+    help="Filter jobs by job state.",
 )
 opt_command = click.option(
-    "--command", "-c",
-    type=click.Choice(commands),
-    help="Filter jobs by command."
+    "--command", "-c", type=click.Choice(commands), help="Filter jobs by command."
 )
 opt_dask_specs = click.option(
-    "--dask_specs", "-w",
+    "--dask_specs",
+    "-w",
     type=click.STRING,
     callback=_check_dask_specs,
     default="default",
-    help="Choose worker performance class."
+    help="Choose worker performance class.",
 )
 opt_since = click.option(
     "--since",
     type=click.STRING,
     callback=_get_timestamp,
     help="Filter jobs by timestamp since given time.",
-    default="7d"
+    default="7d",
 )
 opt_since_no_default = click.option(
     "--since",
     type=click.STRING,
     callback=_get_timestamp,
-    help="Filter jobs by timestamp since given time."
+    help="Filter jobs by timestamp since given time.",
 )
 opt_until = click.option(
     "--until",
@@ -230,53 +222,49 @@ opt_until = click.option(
     help="Filter jobs by timestamp until given time.",
 )
 opt_job_ids = click.option(
-    "--job-ids", "-j",
+    "--job-ids",
+    "-j",
     type=click.STRING,
     help="One or multiple job IDs separated by comma.",
-    callback=_expand_job_ids
+    callback=_expand_job_ids,
 )
-opt_force = click.option(
-    "--force", "-f",
-    is_flag=True,
-    help="Don't ask, just do."
-)
+opt_force = click.option("--force", "-f", is_flag=True, help="Don't ask, just do.")
 opt_verbose = click.option(
-    "--verbose", "-v",
+    "--verbose",
+    "-v",
     is_flag=True,
-    help="Print job details. (Does not work with --geojson.)"
+    help="Print job details. (Does not work with --geojson.)",
 )
 opt_sort_by = click.option(
     "--sort-by",
     type=click.Choice(["started", "runtime", "state", "progress"]),
     default="state",
-    help="Sort jobs. (default: state)"
+    help="Sort jobs. (default: state)",
 )
 opt_mhub_user = click.option(
-    "--user", "-u",
-    type=click.STRING,
-    help="Username for basic auth."
+    "--user", "-u", type=click.STRING, help="Username for basic auth."
 )
 opt_mhub_password = click.option(
-    "--password", "-p",
-    type=click.STRING,
-    help="Password for basic auth."
+    "--password", "-p", type=click.STRING, help="Password for basic auth."
 )
+
 
 @click.version_option(version=__version__, message="%(version)s")
 @click.group(help="Process control on Mapchete Hub.")
 @click.option(
-    "--host", "-h",
+    "--host",
+    "-h",
     type=click.STRING,
     nargs=1,
     default=f"{host_options['host_ip']}:{host_options['port']}",
     help="""Address and port of mhub endpoint (default: """
-        f"""{host_options['host_ip']}:{host_options['port']})."""
+    f"""{host_options['host_ip']}:{host_options['port']}).""",
 )
 @click.option(
     "--timeout",
     type=click.INT,
     default=default_timeout,
-    help=f"Time in seconds to wait for server response. (default: {default_timeout})"
+    help=f"Time in seconds to wait for server response. (default: {default_timeout})",
 )
 @opt_mhub_user
 @opt_mhub_password
@@ -303,10 +291,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
     """Cancel jobs and their follow-up jobs if batch was submitted."""
     try:
 
-        kwargs.update(
-            from_date=kwargs.pop("since"),
-            to_date=kwargs.pop("until")
-        )
+        kwargs.update(from_date=kwargs.pop("since"), to_date=kwargs.pop("until"))
 
         if job_ids:
             jobs = [Client(**ctx.obj).job(job_id) for job_id in job_ids]
@@ -334,7 +319,9 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
 
         for job_id in job_ids:
             click.echo(job_id)
-        if force or click.confirm(f"Do you really want to cancel {len(job_ids)} job(s)?", abort=True):
+        if force or click.confirm(
+            f"Do you really want to cancel {len(job_ids)} job(s)?", abort=True
+        ):
             for job_id in job_ids:
                 job = Client(**ctx.obj).cancel_job(job_id)
                 logger.debug(job.to_dict())
@@ -358,14 +345,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
 @opt_debug
 @opt_job_name
 @click.pass_context
-def execute(
-    ctx,
-    mapchete_files,
-    overwrite=False,
-    verbose=False,
-    debug=False,
-    **kwargs
-):
+def execute(ctx, mapchete_files, overwrite=False, verbose=False, debug=False, **kwargs):
     """Execute a process."""
     for mapchete_file in mapchete_files:
         try:
@@ -375,7 +355,7 @@ def execute(
                 params=dict(
                     kwargs,
                     mode="overwrite" if overwrite else "continue",
-                )
+                ),
             )
             if verbose:  # pragma: no cover
                 click.echo(f"job {job.job_id} {job.state}")
@@ -389,15 +369,13 @@ def execute(
 @mhub.command(short_help="Show job status.")
 @click.argument("job_id", type=click.STRING)
 @opt_geojson
-@click.option(
-    "--traceback",
-    is_flag=True,
-    help="Print only traceback if available."
-)
+@click.option("--traceback", is_flag=True, help="Print only traceback if available.")
 @opt_progress
 @opt_debug
 @click.pass_context
-def job(ctx, job_id, geojson=False, traceback=False, progress=False, debug=False, **kwargs):
+def job(
+    ctx, job_id, geojson=False, traceback=False, progress=False, debug=False, **kwargs
+):
     """Show job status."""
     try:
         job = Client(**ctx.obj).job(job_id, geojson=geojson)
@@ -429,14 +407,7 @@ def job(ctx, job_id, geojson=False, traceback=False, progress=False, debug=False
 @opt_verbose
 @opt_debug
 @click.pass_context
-def jobs(
-     ctx,
-    geojson=False,
-    verbose=False,
-    sort_by=None,
-    debug=False,
-    **kwargs
-):
+def jobs(ctx, geojson=False, verbose=False, sort_by=None, debug=False, **kwargs):
     """Show current jobs."""
 
     def _sort_jobs(jobs, sort_by=None):
@@ -446,31 +417,33 @@ def jobs(
                     jobs,
                     key=lambda x: (
                         x.to_dict()["properties"]["state"],
-                        x.to_dict()["properties"]["updated"]
-                    )
+                        x.to_dict()["properties"]["updated"],
+                    ),
                 )
             )
         elif sort_by in ["started", "runtime"]:
             return list(
-                sorted(jobs, key=lambda x: x.to_dict()["properties"][sort_by] or 0.)
+                sorted(jobs, key=lambda x: x.to_dict()["properties"][sort_by] or 0.0)
             )
         elif sort_by == "progress":
+
             def _get_progress(job):
                 properties = job.to_dict().get("properties", {})
                 current = properties.get("current_progress")
                 total = properties.get("total_progress")
-                return 100 * current / total if total else 0.
+                return 100 * current / total if total else 0.0
+
             return list(sorted(jobs, key=lambda x: _get_progress(x)))
 
     kwargs.update(from_date=kwargs.pop("since"), to_date=kwargs.pop("until"))
     try:
         if geojson:
-            click.echo(
-                Client(**ctx.obj).jobs(geojson=True, **kwargs)
-            )
+            click.echo(Client(**ctx.obj).jobs(geojson=True, **kwargs))
         else:
             # sort by state and then by timestamp
-            jobs = _sort_jobs(Client(**ctx.obj).jobs(**kwargs).values(), sort_by=sort_by)
+            jobs = _sort_jobs(
+                Client(**ctx.obj).jobs(**kwargs).values(), sort_by=sort_by
+            )
             logger.debug(jobs)
             if verbose:
                 click.echo(f"{len(jobs)} jobs found. \n")
@@ -485,20 +458,15 @@ def jobs(
 @click.option(
     "--process_name", "-n", type=click.STRING, help="Print docstring of process."
 )
-@click.option(
-    "--docstrings", is_flag=True, help="Print docstrings of all processes."
-)
+@click.option("--docstrings", is_flag=True, help="Print docstrings of all processes.")
 @opt_debug
 @click.pass_context
 def processes(ctx, process_name=None, docstrings=False, **kwargs):
     """Show available processes."""
+
     def _print_process_info(process_module, docstrings=False):
         click.echo(
-            click.style(
-                process_module["title"],
-                bold=docstrings,
-                underline=docstrings
-            )
+            click.style(process_module["title"], bold=docstrings, underline=docstrings)
         )
         if docstrings:
             click.echo(process_module["description"])
@@ -509,10 +477,7 @@ def processes(ctx, process_name=None, docstrings=False, **kwargs):
             raise ConnectionError(res.json())
 
         # get all registered processes
-        processes = {
-            p.get("title"): p
-            for p in res.json().get("processes")
-        }
+        processes = {p.get("title"): p for p in res.json().get("processes")}
 
         # print selected process
         if process_name:
@@ -557,13 +522,10 @@ def retry(
     verbose=False,
     force=False,
     debug=False,
-    **kwargs
+    **kwargs,
 ):
     """Retry jobs and their follow-up jobs if batch was submitted."""
-    kwargs.update(
-        from_date=kwargs.pop("since"),
-        to_date=kwargs.pop("until")
-    )
+    kwargs.update(from_date=kwargs.pop("since"), to_date=kwargs.pop("until"))
 
     try:
         if job_ids:
@@ -592,7 +554,9 @@ def retry(
 
         for job_id in job_ids:
             click.echo(job_id)
-        if force or click.confirm(f"Do you really want to retry {len(job_ids)} job(s)?", abort=True):
+        if force or click.confirm(
+            f"Do you really want to retry {len(job_ids)} job(s)?", abort=True
+        ):
             for job_id in job_ids:
                 job = Client(**ctx.obj).retry_job(job_id)
                 click.echo(f"job {job.state}")
@@ -605,7 +569,6 @@ def retry(
 # helper fucntions #
 ####################
 def _print_job_details(job, verbose=False):
-
     def _pretty_runtime(elapsed):
         minutes, seconds = divmod(elapsed, 60)
         hours, minutes = divmod(minutes, 60)
@@ -648,7 +611,7 @@ def _print_job_details(job, verbose=False):
         # progress
         current = properties.get("current_progress")
         total = properties.get("total_progress")
-        progress = round(100 * current / total, 2) if total else 0.
+        progress = round(100 * current / total, 2) if total else 0.0
         click.echo(f"progress: {progress}%")
 
         # command
@@ -694,7 +657,7 @@ def _show_progress(ctx, job_id, disable=False):
             total=i["total_progress"],
             initial=last_progress,
             disable=disable,
-            unit="task"
+            unit="task",
         ) as pbar:
             for i in progress:
                 current_progress = i["current_progress"]
