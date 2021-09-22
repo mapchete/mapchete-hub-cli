@@ -22,6 +22,8 @@ def test_start_job(mhub_client, example_config_json):
     job.wait(wait_for_max=120)
     assert mhub_client.job(job.job_id).state == "done"
 
+    assert isinstance(job.to_json(), str)
+
 
 def test_start_job_custom_process(mhub_client, example_config_custom_process_json):
     """Start a job and return job state."""

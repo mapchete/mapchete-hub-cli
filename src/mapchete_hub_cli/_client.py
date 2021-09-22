@@ -315,10 +315,10 @@ class Client():
                     raise JobAborting(f"job {job_id} aborting")
                 else:
                     return
-            elif job.state == "cancelled":
+            elif job.state == "cancelled":  # pragma: no cover
                 if raise_exc:
                     raise JobCancelled(f"job {job_id} cancelled")
-                else:  # pragma: no cover
+                else:
                     return
             elif job.state == "failed":
                 if raise_exc:
