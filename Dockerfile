@@ -1,4 +1,7 @@
-FROM registry.gitlab.eox.at/maps/mapchete_hub/mhub:fastapi_dask
+ARG BASE_IMAGE=registry.gitlab.eox.at/maps/mapchete_hub/mhub
+ARG BASE_IMAGE_TAG=0.20
+
+FROM ${BASE_IMAGE}:${BASE_IMAGE_TAG}
 MAINTAINER Joachim Ungar
 
 WORKDIR /mnt/data
