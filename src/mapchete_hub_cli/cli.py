@@ -337,7 +337,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
         if force or click.confirm(f"Do you really want to cancel {len(job_ids)} job(s)?", abort=True):
             for job_id in job_ids:
                 job = API(**ctx.obj).cancel_job(job_id)
-                logger.debug(job.json)
+                logger.debug(job.to_dict())
                 click.echo(f"job {job.state}")
 
     except Exception as e:  # pragma: no cover
@@ -383,7 +383,6 @@ def execute(
             else:
                 click.echo(job.job_id)
         except Exception as e:  # pragma: no cover
-            raise
             raise click.ClickException(e)
 
 
@@ -404,9 +403,10 @@ def job(ctx, job_id, geojson=False, traceback=False, progress=False, debug=False
         job = API(**ctx.obj).job(job_id, geojson=geojson)
         if geojson:  # pragma: no cover
             click.echo(job)
+            return
         elif traceback:  # pragma: no cover
-            click.echo(job.json["properties"].get("exception"))
-            click.echo(job.json["properties"].get("traceback"))
+            click.echo(job.to_dict()["properties"].get("exception"))
+            click.echo(job.to_dict()["properties"].get("traceback"))
         if progress:  # pragma: no cover
             click.echo(f"job {job.job_id} {job.state}")
             _show_progress(ctx, job_id, disable=debug)
@@ -445,18 +445,18 @@ def jobs(
                 sorted(
                     jobs,
                     key=lambda x: (
-                        x.json["properties"]["state"],
-                        x.json["properties"]["updated"]
+                        x.to_dict()["properties"]["state"],
+                        x.to_dict()["properties"]["updated"]
                     )
                 )
             )
         elif sort_by in ["started", "runtime"]:
             return list(
-                sorted(jobs, key=lambda x: x.json["properties"][sort_by] or 0.)
+                sorted(jobs, key=lambda x: x.to_dict()["properties"][sort_by] or 0.)
             )
         elif sort_by == "progress":
             def _get_progress(job):
-                properties = job.json.get("properties", {})
+                properties = job.to_dict().get("properties", {})
                 current = properties.get("current_progress")
                 total = properties.get("total_progress")
                 return 100 * current / total if total else 0.
@@ -629,7 +629,7 @@ def _print_job_details(job, verbose=False):
                     color = "red"
                 elif state in ["aborting", "cancelled"]:
                     color = "magenta"
-    properties = job.json["properties"]
+    properties = job.to_dict()["properties"]
     mapchete_config = properties.get("mapchete", {}).get("config", {})
 
     # job ID and job state

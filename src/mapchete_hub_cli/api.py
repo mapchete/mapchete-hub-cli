@@ -43,13 +43,19 @@ class Job():
         self.state = state
         self.job_id = job_id
         self.exists = True if status_code == 409 else False
-        self.json = OrderedDict(json.items())
-        self.__geo_interface__ = self.json["geometry"]
+        self._dict = OrderedDict(json.items())
+        self.__geo_interface__ = self._dict["geometry"]
         self._api = _api
+
+    def to_dict(self):
+        return self._dict
+
+    def to_json(self, indent=4):
+        return json.dumps(self._dict, indent=indent)
 
     def __repr__(self):  # pragma: no cover
         """Print Job."""
-        return f"Job(status_code={self.status_code}, state={self.state}, job_id={self.job_id}, json={self.json}"
+        return f"Job(status_code={self.status_code}, state={self.state}, job_id={self.job_id}, dict={self.to_dict()}"
 
     def wait(self, wait_for_max=None, raise_exc=True):
         """Block until job has finished processing."""
@@ -215,9 +221,9 @@ class API():
         """
         existing_job = self.job(job_id)
         return self.start_job(
-            config=existing_job.json["properties"]["mapchete"]["config"],
-            command=existing_job.json["properties"]["mapchete"]["command"],
-            params=existing_job.json["properties"]["mapchete"]["params"]
+            config=existing_job.to_dict()["properties"]["mapchete"]["config"],
+            command=existing_job.to_dict()["properties"]["mapchete"]["command"],
+            params=existing_job.to_dict()["properties"]["mapchete"]["params"]
         )
 
     def job(self, job_id, geojson=False, indent=4):
@@ -287,7 +293,7 @@ class API():
             job = self.job(job_id)
             if wait_for_max is not None and time.time() - start > wait_for_max:  # pragma: no cover
                 raise RuntimeError(f"job not done in time, last state was '{job.state}'")
-            properties = job.json["properties"]
+            properties = job.to_dict()["properties"]
             if job.state == "pending":  # pragma: no cover
                 continue
             elif job.state == "running" and properties.get("total_progress"):

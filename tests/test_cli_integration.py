@@ -81,7 +81,7 @@ def test_cancel_by_job_id(mhub_integration_api, cli, example_config_mapchete):
     # wait and make sure it is cancelled
     job = mhub_integration_api.job(job_id)
     job.wait(wait_for_max=120, raise_exc=False)
-    assert mhub_integration_api.job(job_id).state == "cancelled"
+    assert mhub_integration_api.job(job_id).state in ["aborting", "cancelled"]
 
 
 @pytest.mark.skipif(not ENDPOINT_AVAILABLE, reason="requires up and running endpoint using docker-compose")
@@ -98,7 +98,7 @@ def test_cancel_by_search(mhub_integration_api, cli, example_config_mapchete):
     # wait and make sure it is cancelled
     job = mhub_integration_api.job(job_id)
     job.wait(wait_for_max=120, raise_exc=False)
-    assert mhub_integration_api.job(job_id).state == "cancelled"
+    assert mhub_integration_api.job(job_id).state in ["aborting", "cancelled"]
 
 
 @pytest.mark.skipif(not ENDPOINT_AVAILABLE, reason="requires up and running endpoint using docker-compose")
