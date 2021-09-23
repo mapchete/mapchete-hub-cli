@@ -27,8 +27,8 @@ def _check_dask_specs(ctx, param, dask_specs):
     if res.status_code != 200:  # pragma: no cover
         raise ConnectionError(res.json())
     for w in res.json().keys():
-        if dask_specs not in res.json().keys():
-            raise TypeError(f"Dask specs name not in {res.json().keys()}!!!")
+        if dask_specs not in res.json().keys():  # pragma: no cover
+            raise TypeError(f"dask specs must be one of {res.json().keys()}")
 
 
 def _get_timestamp(ctx, param, timestamp):

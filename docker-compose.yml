@@ -16,7 +16,7 @@ services:
     command: ["--bind_ip_all"]
 
   server:
-    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:dask_scheduler_settings
+    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:0.21
     depends_on:
       - dask_scheduler
       - db
@@ -31,13 +31,13 @@ services:
     command: ["uvicorn", "mapchete_hub.app:app", "--host", "0.0.0.0", "--port", "${MHUB_PORT:-5000}", "--log-level", "debug"]
 
   dask_scheduler:
-    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:dask_scheduler_settings
+    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:0.21
     networks:
       - backend
     command: ["dask-scheduler", "--host", "dask_scheduler", "--port", "8786"]
 
   dask_worker:
-    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:dask_scheduler_settings
+    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:0.21
     depends_on:
       - dask_scheduler
     networks:

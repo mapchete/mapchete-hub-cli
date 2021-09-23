@@ -28,6 +28,16 @@ def test_cli(cli):
     not ENDPOINT_AVAILABLE,
     reason="requires up and running endpoint using docker-compose",
 )
+def test_dask_specs(cli):
+    result = cli.run("dask-specs")
+    assert result.exit_code == 0
+    assert "default" in result.output
+
+
+@pytest.mark.skipif(
+    not ENDPOINT_AVAILABLE,
+    reason="requires up and running endpoint using docker-compose",
+)
 def test_execute(mhub_integration_client, cli, example_config_mapchete):
     result = cli.run(f"execute {example_config_mapchete.path}")
     assert result.exit_code == 0

@@ -91,7 +91,7 @@ class Client:
     ):
         """Initialize."""
         env_host = os.environ.get("MHUB_HOST")
-        if env_host:
+        if env_host:  # pragma: no cover
             logger.debug(f"got mhub host from env: {env_host}")
             host = env_host
         host = host if host.startswith("http") else f"http://{host}"
