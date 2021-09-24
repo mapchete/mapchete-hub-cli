@@ -163,26 +163,27 @@ class Client:
 
         Parameters
         ----------
-        mapchete_config : path or dict
+        config : path or dict
             Either path to .mapchete file or dictionary with mapchete parameters.
         command : str
             Either "execute" or "index".
-        job_id : str (optional)
-            Unique job ID.
-        bounds : list
-            Left, bottom, right, top coordinate of process area.
-        point : list
-            X and y coordinate of point over process tile.
-        tile : list
-            Zoom, row and column of process tile.
-        geometry : str
-            GeoJSON representaion of process area.
-        worker_specs: str
-            One of EOX Mhub worker spec names choose from: [
-                default|s2_16bit_regular|s2_16bit_large|s1_large|custom
-            ]
-        zoom : list or int
-            Minimum and maximum zoom level or single zoom level.
+        params : dict
+            Mapchete execution parameters, e.g.
+
+            bounds : list
+                Left, bottom, right, top coordinate of process area.
+            point : list
+                X and y coordinate of point over process tile.
+            tile : list
+                Zoom, row and column of process tile.
+            geometry : str
+                GeoJSON representaion of process area.
+            dask_specs: str
+                One of EOX Mhub worker spec names choose from: [
+                    default|s2_16bit_regular|s2_16bit_large|s1_large|custom
+                ]
+            zoom : list or int
+                Minimum and maximum zoom level or single zoom level.
 
         Returns
         -------
