@@ -67,14 +67,30 @@ class Job:
         """Block until job has finished processing."""
         list(self.progress(wait_for_max=wait_for_max, raise_exc=raise_exc))
 
-    def progress(self, wait_for_max=None, raise_exc=True, interval=0.3):
+    def progress(self, wait_for_max=None, raise_exc=True, interval=0.3, smooth=False):
         """Yield job progress messages."""
-        yield from self._client.job_progress(
+        progress_iter = self._client.job_progress(
             self.job_id,
             wait_for_max=wait_for_max,
             raise_exc=raise_exc,
             interval=interval,
         )
+        if smooth:
+            i = next(progress_iter)
+            last_progress = i["current_progress"]
+            yield i
+            for i in progress_iter:
+                current_progress = i["current_progress"]
+                jump = current_progress - last_progress
+                for j in range(jump):
+                    time.sleep(interval / jump)
+                    yield dict(
+                        i,
+                        current_progress=last_progress + j,
+                    )
+                last_progress = current_progress
+        else:
+            yield from progress_iter
 
 
 class Client:

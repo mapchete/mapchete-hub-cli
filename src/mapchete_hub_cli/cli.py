@@ -649,9 +649,9 @@ def _print_job_details(job, verbose=False):
 
 def _show_progress(ctx, job_id, disable=False):
     try:
-        progress = Client(**ctx.obj).job(job_id).progress()
+        progress_iter = Client(**ctx.obj).job(job_id).progress(smooth=True)
         click.echo("wait for job progress...")
-        i = next(progress)
+        i = next(progress_iter)
         last_progress = i["current_progress"]
         with tqdm(
             total=i["total_progress"],
@@ -659,7 +659,7 @@ def _show_progress(ctx, job_id, disable=False):
             disable=disable,
             unit="task",
         ) as pbar:
-            for i in progress:
+            for i in progress_iter:
                 current_progress = i["current_progress"]
                 pbar.update(current_progress - last_progress)
                 last_progress = current_progress
