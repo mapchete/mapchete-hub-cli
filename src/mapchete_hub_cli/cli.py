@@ -195,7 +195,7 @@ opt_command = click.option(
     "--command", "-c", type=click.Choice(commands), help="Filter jobs by command."
 )
 opt_dask_specs = click.option(
-    "--dask_specs",
+    "--dask-specs",
     "-w",
     type=click.STRING,
     callback=_check_dask_specs,
