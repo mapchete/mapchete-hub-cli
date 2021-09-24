@@ -50,7 +50,9 @@ class Job:
         self.job_id = job_id
         self.exists = True if status_code == 409 else False
         self._dict = OrderedDict(json.items())
-        self.__geo_interface__ = self._dict["geometry"]
+        self.geometry = self.__geo_interface__ = self._dict["geometry"]
+        self.bounds = self._dict.get("bounds")
+        self.properties = self._dict["properties"]
         self._client = _client
 
     def to_dict(self):

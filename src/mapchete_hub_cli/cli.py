@@ -612,60 +612,55 @@ def _print_job_details(job, metadata_items=None, verbose=False):
                     color = "red"
                 elif state in ["aborting", "cancelled"]:
                     color = "magenta"
-    properties = job.to_dict()["properties"]
-    mapchete_config = properties.get("mapchete", {}).get("config", {})
+    mapchete_config = job.properties.get("mapchete", {}).get("config", {})
 
     # job ID and job state
     click.echo(click.style(f"{job.job_id}", fg=color, bold=True))
 
     if verbose:
         # job name
-        click.echo(f"job name: {properties.get('job_name')}")
+        click.echo(f"job name: {job.properties.get('job_name')}")
 
         # state
         click.echo(click.style(f"state: {job.state}"))
 
         # exception
-        click.echo(click.style(f"exception: {properties.get('exception')}"))
+        click.echo(click.style(f"exception: {job.properties.get('exception')}"))
 
         # progress
-        current = properties.get("current_progress")
-        total = properties.get("total_progress")
+        current = job.properties.get("current_progress")
+        total = job.properties.get("total_progress")
         progress = round(100 * current / total, 2) if total else 0.0
         click.echo(f"progress: {progress}%")
 
         # command
-        click.echo(f"command: {properties.get('command')}")
+        click.echo(f"command: {job.properties.get('command')}")
 
         # output path
         click.echo(f"output path: {mapchete_config.get('output', {}).get('path')}")
 
         # bounds
-        # try:
-        #     bounds = ", ".join(map(str, shape(job).bounds))
-        # except:  # pragma: no cover
-        #     bounds = None
-        # click.echo(f"bounds: {bounds}")
+        click.echo(f"bounds: {job.bounds}")
 
         # start time
-        started = properties.get("started", "unknown")
+        started = job.properties.get("started", "unknown")
         click.echo(f"started: {started}")
 
         # finish time
-        finished = properties.get("finished", "unknown")
+        finished = job.properties.get("finished", "unknown")
         click.echo(f"finished: {finished}")
 
         # runtime
-        runtime = properties.get("runtime", "unknown")
+        runtime = job.properties.get("runtime", "unknown")
         click.echo(f"runtime: {_pretty_runtime(runtime) if runtime else None}")
 
         # last received update
-        last_update = properties.get("updated", "unknown")
+        last_update = job.properties.get("updated", "unknown")
         click.echo(f"last received update: {last_update}")
 
     if metadata_items:
         for i in metadata_items:
-            click.echo(f"{i}: {properties.get(i)}")
+            click.echo(f"{i}: {job.properties.get(i)}")
 
     if verbose or metadata_items:
         # append newline
