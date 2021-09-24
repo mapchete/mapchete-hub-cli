@@ -12,7 +12,7 @@ import logging
 import os
 import py_compile
 import requests
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError, HTTPError
 import time
 import uuid
 import oyaml as yaml
@@ -115,8 +115,8 @@ class Client:
         self.host = host if host.endswith("/") else f"{host}/"
         logger.debug(f"use host name {self.host}")
         self.timeout = timeout or default_timeout
-        self._user = user
-        self._password = password
+        self._user = user or os.environ.get("MHUB_USER")
+        self._password = password or os.environ.get("MHUB_PASSWORD")
         self._test_client = _test_client
         self._client = _test_client if _test_client else requests
         self._baseurl = "" if _test_client else host
@@ -136,6 +136,8 @@ class Client:
             logger.debug(f"{request_type}: {request_url}, {request_kwargs}")
             res = _request_func[request_type](request_url, **request_kwargs)
             logger.debug(f"response: {res}")
+            if res.status_code == 401:
+                raise HTTPError("Authorization failure")
             return res
         except ConnectionError:  # pragma: no cover
             raise ConnectionError(f"no mhub server found at {self.host}")
