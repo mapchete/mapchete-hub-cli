@@ -29,6 +29,7 @@ def _check_dask_specs(ctx, param, dask_specs):
     for w in res.json().keys():
         if dask_specs not in res.json().keys():  # pragma: no cover
             raise TypeError(f"dask specs must be one of {res.json().keys()}")
+        return dask_specs
 
 
 def _get_timestamp(ctx, param, timestamp):
@@ -80,10 +81,10 @@ def _get_timestamp(ctx, param, timestamp):
         return date_to_str(timestamp)
 
 
-def _expand_job_ids(ctx, param, job_ids):
-    if job_ids:
-        job_ids = job_ids.split(",")
-    return job_ids
+def _expand_str_list(ctx, param, str_list):
+    if str_list:
+        str_list = str_list.split(",")
+    return str_list
 
 
 def _validate_mapchete_files(ctx, param, mapchete_files):
@@ -226,7 +227,7 @@ opt_job_ids = click.option(
     "-j",
     type=click.STRING,
     help="One or multiple job IDs separated by comma.",
-    callback=_expand_job_ids,
+    callback=_expand_str_list,
 )
 opt_force = click.option("--force", "-f", is_flag=True, help="Don't ask, just do.")
 opt_verbose = click.option(
@@ -246,6 +247,9 @@ opt_mhub_user = click.option(
 )
 opt_mhub_password = click.option(
     "--password", "-p", type=click.STRING, help="Password for basic auth."
+)
+opt_metadata_items = click.option(
+    "--metadata-items", "-i", type=click.STRING, callback=_expand_str_list
 )
 
 
@@ -369,12 +373,20 @@ def execute(ctx, mapchete_files, overwrite=False, verbose=False, debug=False, **
 @mhub.command(short_help="Show job status.")
 @click.argument("job_id", type=click.STRING)
 @opt_geojson
+@opt_metadata_items
 @click.option("--traceback", is_flag=True, help="Print only traceback if available.")
 @opt_progress
 @opt_debug
 @click.pass_context
 def job(
-    ctx, job_id, geojson=False, traceback=False, progress=False, debug=False, **kwargs
+    ctx,
+    job_id,
+    geojson=False,
+    traceback=False,
+    progress=False,
+    debug=False,
+    metadata_items=None,
+    **kwargs,
 ):
     """Show job status."""
     try:
@@ -389,7 +401,7 @@ def job(
             click.echo(f"job {job.job_id} {job.state}")
             _show_progress(ctx, job_id, disable=debug)
         else:
-            _print_job_details(job, verbose=True)
+            _print_job_details(job, metadata_items=metadata_items, verbose=True)
     except Exception as e:  # pragma: no cover
         raise click.ClickException(e)
 
@@ -404,10 +416,19 @@ def job(
 @opt_sort_by
 @opt_bounds
 @opt_geojson
+@opt_metadata_items
 @opt_verbose
 @opt_debug
 @click.pass_context
-def jobs(ctx, geojson=False, verbose=False, sort_by=None, debug=False, **kwargs):
+def jobs(
+    ctx,
+    geojson=False,
+    verbose=False,
+    sort_by=None,
+    debug=False,
+    metadata_items=None,
+    **kwargs,
+):
     """Show current jobs."""
 
     def _sort_jobs(jobs, sort_by=None):
@@ -448,9 +469,8 @@ def jobs(ctx, geojson=False, verbose=False, sort_by=None, debug=False, **kwargs)
             if verbose:
                 click.echo(f"{len(jobs)} jobs found. \n")
             for i in jobs:
-                _print_job_details(i, verbose=verbose)
+                _print_job_details(i, metadata_items=metadata_items, verbose=verbose)
     except Exception as e:  # pragma: no cover
-        raise
         raise click.ClickException(e)
 
 
@@ -568,7 +588,7 @@ def retry(
 
 # helper fucntions #
 ####################
-def _print_job_details(job, verbose=False):
+def _print_job_details(job, metadata_items=None, verbose=False):
     def _pretty_runtime(elapsed):
         minutes, seconds = divmod(elapsed, 60)
         hours, minutes = divmod(minutes, 60)
@@ -643,6 +663,11 @@ def _print_job_details(job, verbose=False):
         last_update = properties.get("updated", "unknown")
         click.echo(f"last received update: {last_update}")
 
+    if metadata_items:
+        for i in metadata_items:
+            click.echo(f"{i}: {properties.get(i)}")
+
+    if verbose or metadata_items:
         # append newline
         click.echo("")
 
