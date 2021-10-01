@@ -8,11 +8,12 @@ in order to be able to test mhub CLI.
 from collections import namedtuple, OrderedDict
 import datetime
 import json
+from json.decoder import JSONDecodeError
 import logging
 import os
 import py_compile
 import requests
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError, HTTPError
 import time
 import uuid
 import oyaml as yaml
@@ -50,7 +51,9 @@ class Job:
         self.job_id = job_id
         self.exists = True if status_code == 409 else False
         self._dict = OrderedDict(json.items())
-        self.__geo_interface__ = self._dict["geometry"]
+        self.geometry = self.__geo_interface__ = self._dict["geometry"]
+        self.bounds = self._dict.get("bounds")
+        self.properties = self._dict["properties"]
         self._client = _client
 
     def to_dict(self):
@@ -67,14 +70,30 @@ class Job:
         """Block until job has finished processing."""
         list(self.progress(wait_for_max=wait_for_max, raise_exc=raise_exc))
 
-    def progress(self, wait_for_max=None, raise_exc=True, interval=0.3):
+    def progress(self, wait_for_max=None, raise_exc=True, interval=0.3, smooth=False):
         """Yield job progress messages."""
-        yield from self._client.job_progress(
+        progress_iter = self._client.job_progress(
             self.job_id,
             wait_for_max=wait_for_max,
             raise_exc=raise_exc,
             interval=interval,
         )
+        if smooth:
+            i = next(progress_iter)
+            last_progress = i["current_progress"]
+            yield i
+            for i in progress_iter:
+                current_progress = i["current_progress"]
+                jump = current_progress - last_progress
+                for j in range(jump):
+                    time.sleep(interval / jump)
+                    yield dict(
+                        i,
+                        current_progress=last_progress + j,
+                    )
+                last_progress = current_progress
+        else:
+            yield from progress_iter
 
 
 class Client:
@@ -99,8 +118,8 @@ class Client:
         self.host = host if host.endswith("/") else f"{host}/"
         logger.debug(f"use host name {self.host}")
         self.timeout = timeout or default_timeout
-        self._user = user
-        self._password = password
+        self._user = user or os.environ.get("MHUB_USER")
+        self._password = password or os.environ.get("MHUB_PASSWORD")
         self._test_client = _test_client
         self._client = _test_client if _test_client else requests
         self._baseurl = "" if _test_client else host
@@ -120,6 +139,10 @@ class Client:
             logger.debug(f"{request_type}: {request_url}, {request_kwargs}")
             res = _request_func[request_type](request_url, **request_kwargs)
             logger.debug(f"response: {res}")
+            if res.status_code == 401:
+                raise HTTPError("Authorization failure")
+            elif res.status_code >= 500:
+                logger.error(f"response text: {res.text}")
             return res
         except ConnectionError:  # pragma: no cover
             raise ConnectionError(f"no mhub server found at {self.host}")
@@ -145,26 +168,27 @@ class Client:
 
         Parameters
         ----------
-        mapchete_config : path or dict
+        config : path or dict
             Either path to .mapchete file or dictionary with mapchete parameters.
         command : str
             Either "execute" or "index".
-        job_id : str (optional)
-            Unique job ID.
-        bounds : list
-            Left, bottom, right, top coordinate of process area.
-        point : list
-            X and y coordinate of point over process tile.
-        tile : list
-            Zoom, row and column of process tile.
-        geometry : str
-            GeoJSON representaion of process area.
-        worker_specs: str
-            One of EOX Mhub worker spec names choose from: [
-                default|s2_16bit_regular|s2_16bit_large|s1_large|custom
-            ]
-        zoom : list or int
-            Minimum and maximum zoom level or single zoom level.
+        params : dict
+            Mapchete execution parameters, e.g.
+
+            bounds : list
+                Left, bottom, right, top coordinate of process area.
+            point : list
+                X and y coordinate of point over process tile.
+            tile : list
+                Zoom, row and column of process tile.
+            geometry : str
+                GeoJSON representaion of process area.
+            dask_specs: str
+                One of EOX Mhub worker spec names choose from: [
+                    default|s2_16bit_regular|s2_16bit_large|s1_large|custom
+                ]
+            zoom : list or int
+                Minimum and maximum zoom level or single zoom level.
 
         Returns
         -------
@@ -187,7 +211,10 @@ class Client:
         )
 
         if res.status_code != 201:
-            raise JobRejected(res.json())
+            try:
+                raise JobRejected(res.json())
+            except JSONDecodeError:  # pragma: no cover
+                raise Exception(res.text)
         else:
             job_id = res.json()["id"]
             logger.debug(f"job {job_id} sent")
@@ -260,7 +287,10 @@ class Client:
             params=dict(kwargs, bounds=",".join(map(str, bounds)) if bounds else None),
         )
         if res.status_code != 200:  # pragma: no cover
-            raise Exception(res.json())
+            try:
+                raise Exception(res.json())
+            except JSONDecodeError:  # pragma: no cover
+                raise Exception(res.text)
         return (
             json.dumps(res.json(), indent=indent)
             if geojson

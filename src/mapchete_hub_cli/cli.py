@@ -29,6 +29,7 @@ def _check_dask_specs(ctx, param, dask_specs):
     for w in res.json().keys():
         if dask_specs not in res.json().keys():  # pragma: no cover
             raise TypeError(f"dask specs must be one of {res.json().keys()}")
+    return dask_specs
 
 
 def _get_timestamp(ctx, param, timestamp):
@@ -80,10 +81,10 @@ def _get_timestamp(ctx, param, timestamp):
         return date_to_str(timestamp)
 
 
-def _expand_job_ids(ctx, param, job_ids):
-    if job_ids:
-        job_ids = job_ids.split(",")
-    return job_ids
+def _expand_str_list(ctx, param, str_list):
+    if str_list:
+        str_list = str_list.split(",")
+    return str_list
 
 
 def _validate_mapchete_files(ctx, param, mapchete_files):
@@ -195,7 +196,7 @@ opt_command = click.option(
     "--command", "-c", type=click.Choice(commands), help="Filter jobs by command."
 )
 opt_dask_specs = click.option(
-    "--dask_specs",
+    "--dask-specs",
     "-w",
     type=click.STRING,
     callback=_check_dask_specs,
@@ -226,7 +227,7 @@ opt_job_ids = click.option(
     "-j",
     type=click.STRING,
     help="One or multiple job IDs separated by comma.",
-    callback=_expand_job_ids,
+    callback=_expand_str_list,
 )
 opt_force = click.option("--force", "-f", is_flag=True, help="Don't ask, just do.")
 opt_verbose = click.option(
@@ -242,10 +243,19 @@ opt_sort_by = click.option(
     help="Sort jobs. (default: state)",
 )
 opt_mhub_user = click.option(
-    "--user", "-u", type=click.STRING, help="Username for basic auth."
+    "--user",
+    "-u",
+    type=click.STRING,
+    help="Username for basic auth. (Or set MHUB_USER env variable.)",
 )
 opt_mhub_password = click.option(
-    "--password", "-p", type=click.STRING, help="Password for basic auth."
+    "--password",
+    "-p",
+    type=click.STRING,
+    help="Password for basic auth. (Or set MHUB_PASSWORD env variable.)",
+)
+opt_metadata_items = click.option(
+    "--metadata-items", "-i", type=click.STRING, callback=_expand_str_list
 )
 
 
@@ -258,7 +268,7 @@ opt_mhub_password = click.option(
     nargs=1,
     default=f"{host_options['host_ip']}:{host_options['port']}",
     help="""Address and port of mhub endpoint (default: """
-    f"""{host_options['host_ip']}:{host_options['port']}).""",
+    f"""{host_options['host_ip']}:{host_options['port']}). (Or set MHUB_HOST env variable.)""",
 )
 @click.option(
     "--timeout",
@@ -363,18 +373,28 @@ def execute(ctx, mapchete_files, overwrite=False, verbose=False, debug=False, **
             else:
                 click.echo(job.job_id)
         except Exception as e:  # pragma: no cover
+            if debug:
+                raise
             raise click.ClickException(e)
 
 
 @mhub.command(short_help="Show job status.")
 @click.argument("job_id", type=click.STRING)
 @opt_geojson
+@opt_metadata_items
 @click.option("--traceback", is_flag=True, help="Print only traceback if available.")
 @opt_progress
 @opt_debug
 @click.pass_context
 def job(
-    ctx, job_id, geojson=False, traceback=False, progress=False, debug=False, **kwargs
+    ctx,
+    job_id,
+    geojson=False,
+    traceback=False,
+    progress=False,
+    debug=False,
+    metadata_items=None,
+    **kwargs,
 ):
     """Show job status."""
     try:
@@ -389,8 +409,10 @@ def job(
             click.echo(f"job {job.job_id} {job.state}")
             _show_progress(ctx, job_id, disable=debug)
         else:
-            _print_job_details(job, verbose=True)
+            _print_job_details(job, metadata_items=metadata_items, verbose=True)
     except Exception as e:  # pragma: no cover
+        if debug:
+            raise
         raise click.ClickException(e)
 
 
@@ -404,10 +426,19 @@ def job(
 @opt_sort_by
 @opt_bounds
 @opt_geojson
+@opt_metadata_items
 @opt_verbose
 @opt_debug
 @click.pass_context
-def jobs(ctx, geojson=False, verbose=False, sort_by=None, debug=False, **kwargs):
+def jobs(
+    ctx,
+    geojson=False,
+    verbose=False,
+    sort_by=None,
+    debug=False,
+    metadata_items=None,
+    **kwargs,
+):
     """Show current jobs."""
 
     def _sort_jobs(jobs, sort_by=None):
@@ -448,9 +479,10 @@ def jobs(ctx, geojson=False, verbose=False, sort_by=None, debug=False, **kwargs)
             if verbose:
                 click.echo(f"{len(jobs)} jobs found. \n")
             for i in jobs:
-                _print_job_details(i, verbose=verbose)
+                _print_job_details(i, metadata_items=metadata_items, verbose=verbose)
     except Exception as e:  # pragma: no cover
-        raise
+        if debug:
+            raise
         raise click.ClickException(e)
 
 
@@ -461,7 +493,7 @@ def jobs(ctx, geojson=False, verbose=False, sort_by=None, debug=False, **kwargs)
 @click.option("--docstrings", is_flag=True, help="Print docstrings of all processes.")
 @opt_debug
 @click.pass_context
-def processes(ctx, process_name=None, docstrings=False, **kwargs):
+def processes(ctx, process_name=None, docstrings=False, debug=None, **kwargs):
     """Show available processes."""
 
     def _print_process_info(process_module, docstrings=False):
@@ -488,6 +520,8 @@ def processes(ctx, process_name=None, docstrings=False, **kwargs):
             for process_name in sorted(processes.keys()):
                 _print_process_info(processes[process_name], docstrings=docstrings)
     except Exception as e:  # pragma: no cover
+        if debug:
+            raise
         raise click.ClickException(e)
 
 
@@ -541,7 +575,7 @@ def retry(
 
         def _yield_retryable_jobs(jobs):
             for j in jobs:
-                if j.state not in job_states["done"]:  # pragma: no cover
+                if j.state not in [*job_states["done"], "aborting"]:  # pragma: no cover
                     click.echo(f"Job {j.job_id} still in state {j.state}.")
                 else:
                     yield j.job_id
@@ -559,7 +593,7 @@ def retry(
         ):
             for job_id in job_ids:
                 job = Client(**ctx.obj).retry_job(job_id)
-                click.echo(f"job {job.state}")
+                click.echo(f"job {job.job_id} {job.state}")
     except Exception as e:  # pragma: no cover
         if debug:
             raise
@@ -568,7 +602,7 @@ def retry(
 
 # helper fucntions #
 ####################
-def _print_job_details(job, verbose=False):
+def _print_job_details(job, metadata_items=None, verbose=False):
     def _pretty_runtime(elapsed):
         minutes, seconds = divmod(elapsed, 60)
         hours, minutes = divmod(minutes, 60)
@@ -592,66 +626,66 @@ def _print_job_details(job, verbose=False):
                     color = "red"
                 elif state in ["aborting", "cancelled"]:
                     color = "magenta"
-    properties = job.to_dict()["properties"]
-    mapchete_config = properties.get("mapchete", {}).get("config", {})
+    mapchete_config = job.properties.get("mapchete", {}).get("config", {})
 
     # job ID and job state
     click.echo(click.style(f"{job.job_id}", fg=color, bold=True))
 
     if verbose:
         # job name
-        click.echo(f"job name: {properties.get('job_name')}")
+        click.echo(f"job name: {job.properties.get('job_name')}")
 
         # state
         click.echo(click.style(f"state: {job.state}"))
 
         # exception
-        click.echo(click.style(f"exception: {properties.get('exception')}"))
+        click.echo(click.style(f"exception: {job.properties.get('exception')}"))
 
         # progress
-        current = properties.get("current_progress")
-        total = properties.get("total_progress")
+        current = job.properties.get("current_progress")
+        total = job.properties.get("total_progress")
         progress = round(100 * current / total, 2) if total else 0.0
         click.echo(f"progress: {progress}%")
 
         # command
-        click.echo(f"command: {properties.get('command')}")
+        click.echo(f"command: {job.properties.get('command')}")
 
         # output path
         click.echo(f"output path: {mapchete_config.get('output', {}).get('path')}")
 
         # bounds
-        # try:
-        #     bounds = ", ".join(map(str, shape(job).bounds))
-        # except:  # pragma: no cover
-        #     bounds = None
-        # click.echo(f"bounds: {bounds}")
+        click.echo(f"bounds: {job.bounds}")
 
         # start time
-        started = properties.get("started", "unknown")
+        started = job.properties.get("started", "unknown")
         click.echo(f"started: {started}")
 
         # finish time
-        finished = properties.get("finished", "unknown")
+        finished = job.properties.get("finished", "unknown")
         click.echo(f"finished: {finished}")
 
         # runtime
-        runtime = properties.get("runtime", "unknown")
+        runtime = job.properties.get("runtime", "unknown")
         click.echo(f"runtime: {_pretty_runtime(runtime) if runtime else None}")
 
         # last received update
-        last_update = properties.get("updated", "unknown")
+        last_update = job.properties.get("updated", "unknown")
         click.echo(f"last received update: {last_update}")
 
+    if metadata_items:
+        for i in metadata_items:
+            click.echo(f"{i}: {job.properties.get(i)}")
+
+    if verbose or metadata_items:
         # append newline
         click.echo("")
 
 
 def _show_progress(ctx, job_id, disable=False):
     try:
-        progress = Client(**ctx.obj).job(job_id).progress()
+        progress_iter = Client(**ctx.obj).job(job_id).progress(smooth=True)
         click.echo("wait for job progress...")
-        i = next(progress)
+        i = next(progress_iter)
         last_progress = i["current_progress"]
         with tqdm(
             total=i["total_progress"],
@@ -659,7 +693,7 @@ def _show_progress(ctx, job_id, disable=False):
             disable=disable,
             unit="task",
         ) as pbar:
-            for i in progress:
+            for i in progress_iter:
                 current_progress = i["current_progress"]
                 pbar.update(current_progress - last_progress)
                 last_progress = current_progress
@@ -667,5 +701,3 @@ def _show_progress(ctx, job_id, disable=False):
     except JobFailed as e:  # pragma: no cover
         click.echo(f"Job {job_id} failed: {e}")
         return
-    except Exception as e:  # pragma: no cover
-        raise click.ClickException(str(e))
