@@ -243,10 +243,16 @@ opt_sort_by = click.option(
     help="Sort jobs. (default: state)",
 )
 opt_mhub_user = click.option(
-    "--user", "-u", type=click.STRING, help="Username for basic auth."
+    "--user",
+    "-u",
+    type=click.STRING,
+    help="Username for basic auth. (Or set MHUB_USER env variable.)",
 )
 opt_mhub_password = click.option(
-    "--password", "-p", type=click.STRING, help="Password for basic auth."
+    "--password",
+    "-p",
+    type=click.STRING,
+    help="Password for basic auth. (Or set MHUB_PASSWORD env variable.)",
 )
 opt_metadata_items = click.option(
     "--metadata-items", "-i", type=click.STRING, callback=_expand_str_list
@@ -262,7 +268,7 @@ opt_metadata_items = click.option(
     nargs=1,
     default=f"{host_options['host_ip']}:{host_options['port']}",
     help="""Address and port of mhub endpoint (default: """
-    f"""{host_options['host_ip']}:{host_options['port']}).""",
+    f"""{host_options['host_ip']}:{host_options['port']}). (Or set MHUB_HOST env variable.)""",
 )
 @click.option(
     "--timeout",
