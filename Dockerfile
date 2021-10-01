@@ -1,5 +1,5 @@
 ARG BASE_IMAGE=registry.gitlab.eox.at/maps/mapchete_hub/mhub
-ARG BASE_IMAGE_TAG=0.21
+ARG BASE_IMAGE_TAG=2021.10.0
 
 FROM ${BASE_IMAGE}:${BASE_IMAGE_TAG}
 MAINTAINER Joachim Ungar

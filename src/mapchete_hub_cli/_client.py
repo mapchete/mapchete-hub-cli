@@ -8,6 +8,7 @@ in order to be able to test mhub CLI.
 from collections import namedtuple, OrderedDict
 import datetime
 import json
+from json.decoder import JSONDecodeError
 import logging
 import os
 import py_compile
@@ -140,6 +141,8 @@ class Client:
             logger.debug(f"response: {res}")
             if res.status_code == 401:
                 raise HTTPError("Authorization failure")
+            elif res.status_code >= 500:
+                logger.error(f"response text: {res.text}")
             return res
         except ConnectionError:  # pragma: no cover
             raise ConnectionError(f"no mhub server found at {self.host}")
@@ -208,7 +211,10 @@ class Client:
         )
 
         if res.status_code != 201:
-            raise JobRejected(res.json())
+            try:
+                raise JobRejected(res.json())
+            except JSONDecodeError:  # pragma: no cover
+                raise Exception(res.text)
         else:
             job_id = res.json()["id"]
             logger.debug(f"job {job_id} sent")
@@ -281,7 +287,10 @@ class Client:
             params=dict(kwargs, bounds=",".join(map(str, bounds)) if bounds else None),
         )
         if res.status_code != 200:  # pragma: no cover
-            raise Exception(res.json())
+            try:
+                raise Exception(res.json())
+            except JSONDecodeError:  # pragma: no cover
+                raise Exception(res.text)
         return (
             json.dumps(res.json(), indent=indent)
             if geojson

@@ -29,7 +29,7 @@ def _check_dask_specs(ctx, param, dask_specs):
     for w in res.json().keys():
         if dask_specs not in res.json().keys():  # pragma: no cover
             raise TypeError(f"dask specs must be one of {res.json().keys()}")
-        return dask_specs
+    return dask_specs
 
 
 def _get_timestamp(ctx, param, timestamp):
@@ -367,6 +367,8 @@ def execute(ctx, mapchete_files, overwrite=False, verbose=False, debug=False, **
             else:
                 click.echo(job.job_id)
         except Exception as e:  # pragma: no cover
+            if debug:
+                raise
             raise click.ClickException(e)
 
 
@@ -403,6 +405,8 @@ def job(
         else:
             _print_job_details(job, metadata_items=metadata_items, verbose=True)
     except Exception as e:  # pragma: no cover
+        if debug:
+            raise
         raise click.ClickException(e)
 
 
@@ -471,6 +475,8 @@ def jobs(
             for i in jobs:
                 _print_job_details(i, metadata_items=metadata_items, verbose=verbose)
     except Exception as e:  # pragma: no cover
+        if debug:
+            raise
         raise click.ClickException(e)
 
 
@@ -481,7 +487,7 @@ def jobs(
 @click.option("--docstrings", is_flag=True, help="Print docstrings of all processes.")
 @opt_debug
 @click.pass_context
-def processes(ctx, process_name=None, docstrings=False, **kwargs):
+def processes(ctx, process_name=None, docstrings=False, debug=None, **kwargs):
     """Show available processes."""
 
     def _print_process_info(process_module, docstrings=False):
@@ -508,6 +514,8 @@ def processes(ctx, process_name=None, docstrings=False, **kwargs):
             for process_name in sorted(processes.keys()):
                 _print_process_info(processes[process_name], docstrings=docstrings)
     except Exception as e:  # pragma: no cover
+        if debug:
+            raise
         raise click.ClickException(e)
 
 
@@ -561,7 +569,7 @@ def retry(
 
         def _yield_retryable_jobs(jobs):
             for j in jobs:
-                if j.state not in job_states["done"]:  # pragma: no cover
+                if j.state not in [*job_states["done"], "aborting"]:  # pragma: no cover
                     click.echo(f"Job {j.job_id} still in state {j.state}.")
                 else:
                     yield j.job_id
@@ -579,7 +587,7 @@ def retry(
         ):
             for job_id in job_ids:
                 job = Client(**ctx.obj).retry_job(job_id)
-                click.echo(f"job {job.state}")
+                click.echo(f"job {job.job_id} {job.state}")
     except Exception as e:  # pragma: no cover
         if debug:
             raise
@@ -687,5 +695,3 @@ def _show_progress(ctx, job_id, disable=False):
     except JobFailed as e:  # pragma: no cover
         click.echo(f"Job {job_id} failed: {e}")
         return
-    except Exception as e:  # pragma: no cover
-        raise click.ClickException(str(e))
