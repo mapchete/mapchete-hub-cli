@@ -137,8 +137,11 @@ class Client:
             request_url = self._baseurl + url
             request_kwargs = self._get_kwargs(kwargs)
             logger.debug(f"{request_type}: {request_url}, {request_kwargs}")
+            start = time.time()
             res = _request_func[request_type](request_url, **request_kwargs)
+            end = time.time()
             logger.debug(f"response: {res}")
+            logger.debug(f"response took {round(end - start, 3)}s")
             if res.status_code == 401:
                 raise HTTPError("Authorization failure")
             elif res.status_code >= 500:

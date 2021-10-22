@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from itertools import chain
 import logging
 from tqdm import tqdm
+import oyaml as yaml
 
 from mapchete_hub_cli import Client, commands, default_timeout, job_states, __version__
 from mapchete_hub_cli.exceptions import JobFailed
@@ -383,6 +384,8 @@ def execute(ctx, mapchete_files, overwrite=False, verbose=False, debug=False, **
 @opt_geojson
 @opt_metadata_items
 @click.option("--traceback", is_flag=True, help="Print only traceback if available.")
+@click.option("--show-config", is_flag=True, help="Print Mapchete config.")
+@click.option("--show-params", is_flag=True, help="Print Mapchete parameters.")
 @opt_progress
 @opt_debug
 @click.pass_context
@@ -390,6 +393,8 @@ def job(
     ctx,
     job_id,
     geojson=False,
+    show_config=False,
+    show_params=False,
     traceback=False,
     progress=False,
     debug=False,
@@ -401,6 +406,18 @@ def job(
         job = Client(**ctx.obj).job(job_id, geojson=geojson)
         if geojson:  # pragma: no cover
             click.echo(job)
+            return
+        elif show_config:
+            click.echo(
+                yaml.dump(job.to_dict()["properties"]["mapchete"]["config"], indent=2)
+            )
+            return
+        elif show_params:
+            for k, v in job.to_dict()["properties"]["mapchete"]["params"].items():
+                if isinstance(v, list):
+                    click.echo(f"{k}: {', '.join(map(str, v)) if v else None}")
+                else:
+                    click.echo(f"{k}: {v}")
             return
         elif traceback:  # pragma: no cover
             click.echo(job.to_dict()["properties"].get("exception"))
