@@ -5,17 +5,17 @@ This module wraps around the requests module for real-life usage and FastAPI's T
 in order to be able to test mhub CLI.
 """
 
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict
 import datetime
 import json
 from json.decoder import JSONDecodeError
 import logging
 import os
 import py_compile
-import requests
-from requests.exceptions import ConnectionError, HTTPError
 import time
-import uuid
+
+import requests
+from requests.exceptions import HTTPError
 import oyaml as yaml
 
 from mapchete_hub_cli.exceptions import (
@@ -30,13 +30,13 @@ from mapchete_hub_cli.exceptions import (
 logger = logging.getLogger(__name__)
 
 
-default_timeout = 5
-job_states = {
+DEFAULT_TIMEOUT = 5
+JOB_STATES = {
     "todo": ["pending"],
     "doing": ["running", "aborting"],
     "done": ["done", "failed", "cancelled"],
 }
-commands = ["execute"]
+COMMANDS = ["execute"]
 
 
 class Job:
@@ -117,7 +117,7 @@ class Client:
         host = host if host.endswith("/") else f"{host}/"
         self.host = host if host.endswith("/") else f"{host}/"
         logger.debug(f"use host name {self.host}")
-        self.timeout = timeout or default_timeout
+        self.timeout = timeout or DEFAULT_TIMEOUT
         self._user = user or os.environ.get("MHUB_USER")
         self._password = password or os.environ.get("MHUB_PASSWORD")
         self._test_client = _test_client
@@ -137,8 +137,11 @@ class Client:
             request_url = self._baseurl + url
             request_kwargs = self._get_kwargs(kwargs)
             logger.debug(f"{request_type}: {request_url}, {request_kwargs}")
+            start = time.time()
             res = _request_func[request_type](request_url, **request_kwargs)
+            end = time.time()
             logger.debug(f"response: {res}")
+            logger.debug(f"response took {round(end - start, 3)}s")
             if res.status_code == 401:
                 raise HTTPError("Authorization failure")
             elif res.status_code >= 500:
@@ -202,7 +205,7 @@ class Client:
         )
 
         # make sure correct command is provided
-        if command not in commands:  # pragma: no cover
+        if command not in COMMANDS:  # pragma: no cover
             raise ValueError(f"invalid command given: {command}")
 
         logger.debug(f"send job to API")

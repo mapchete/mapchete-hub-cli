@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 from itertools import chain
 import logging
 from tqdm import tqdm
+import oyaml as yaml
 
-from mapchete_hub_cli import Client, commands, default_timeout, job_states, __version__
+from mapchete_hub_cli import Client, COMMANDS, DEFAULT_TIMEOUT, JOB_STATES, __version__
 from mapchete_hub_cli.exceptions import JobFailed
 from mapchete_hub_cli.log import set_log_level
 
@@ -186,14 +187,14 @@ opt_state = click.option(
     "-s",
     type=click.Choice(
         (
-            [s.lower() for s in job_states.keys()]
-            + [s.lower() for s in chain(*[g for g in job_states.values()])]
+            [s.lower() for s in JOB_STATES.keys()]
+            + [s.lower() for s in chain(*[g for g in JOB_STATES.values()])]
         )
     ),
     help="Filter jobs by job state.",
 )
 opt_command = click.option(
-    "--command", "-c", type=click.Choice(commands), help="Filter jobs by command."
+    "--command", "-c", type=click.Choice(COMMANDS), help="Filter jobs by command."
 )
 opt_dask_specs = click.option(
     "--dask-specs",
@@ -273,8 +274,8 @@ opt_metadata_items = click.option(
 @click.option(
     "--timeout",
     type=click.INT,
-    default=default_timeout,
-    help=f"Time in seconds to wait for server response. (default: {default_timeout})",
+    default=DEFAULT_TIMEOUT,
+    help=f"Time in seconds to wait for server response. (default: {DEFAULT_TIMEOUT})",
 )
 @opt_mhub_user
 @opt_mhub_password
@@ -316,7 +317,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
 
         def _yield_revokable_jobs(jobs):
             for j in jobs:
-                if j.state in job_states["done"]:  # pragma: no cover
+                if j.state in JOB_STATES["done"]:  # pragma: no cover
                     click.echo(f"Job {j.job_id} already in state {j.state}.")
                 else:
                     yield j.job_id
@@ -383,6 +384,8 @@ def execute(ctx, mapchete_files, overwrite=False, verbose=False, debug=False, **
 @opt_geojson
 @opt_metadata_items
 @click.option("--traceback", is_flag=True, help="Print only traceback if available.")
+@click.option("--show-config", is_flag=True, help="Print Mapchete config.")
+@click.option("--show-params", is_flag=True, help="Print Mapchete parameters.")
 @opt_progress
 @opt_debug
 @click.pass_context
@@ -390,6 +393,8 @@ def job(
     ctx,
     job_id,
     geojson=False,
+    show_config=False,
+    show_params=False,
     traceback=False,
     progress=False,
     debug=False,
@@ -401,6 +406,18 @@ def job(
         job = Client(**ctx.obj).job(job_id, geojson=geojson)
         if geojson:  # pragma: no cover
             click.echo(job)
+            return
+        elif show_config:
+            click.echo(
+                yaml.dump(job.to_dict()["properties"]["mapchete"]["config"], indent=2)
+            )
+            return
+        elif show_params:
+            for k, v in job.to_dict()["properties"]["mapchete"]["params"].items():
+                if isinstance(v, list):
+                    click.echo(f"{k}: {', '.join(map(str, v)) if v else None}")
+                else:
+                    click.echo(f"{k}: {v}")
             return
         elif traceback:  # pragma: no cover
             click.echo(job.to_dict()["properties"].get("exception"))
@@ -540,6 +557,7 @@ def dask_specs(ctx, **kwargs):
 @opt_output_path
 @opt_state
 @opt_command
+@opt_bounds
 @opt_since_no_default
 @opt_until
 @opt_job_name
@@ -575,7 +593,7 @@ def retry(
 
         def _yield_retryable_jobs(jobs):
             for j in jobs:
-                if j.state not in [*job_states["done"], "aborting"]:  # pragma: no cover
+                if j.state not in [*JOB_STATES["done"], "aborting"]:  # pragma: no cover
                     click.echo(f"Job {j.job_id} still in state {j.state}.")
                 else:
                     yield j.job_id
@@ -613,7 +631,7 @@ def _print_job_details(job, metadata_items=None, verbose=False):
         else:
             return f"{round(seconds, 3)}s"
 
-    for group, states in job_states.items():  # pragma: no cover
+    for group, states in JOB_STATES.items():  # pragma: no cover
         for state in states:
             if job.state == state:
                 if group == "todo":
