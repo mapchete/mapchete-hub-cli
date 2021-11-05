@@ -3,6 +3,14 @@ Changelog
 #########
 
 ----------------------
+2021.11.0 - 2021-11-05
+----------------------
+
+    * CLI
+        * add option to show mapchete config
+        * add option to pass on custom dask specs from JSON file
+
+----------------------
 2021.10.0 - 2021-10-01
 ----------------------
 
