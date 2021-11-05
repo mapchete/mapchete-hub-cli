@@ -1,5 +1,5 @@
-from mapchete_hub_cli._client import Client, commands, default_timeout, job_states
+from mapchete_hub_cli._client import Client, COMMANDS, DEFAULT_TIMEOUT, JOB_STATES
 
 
-__all__ = ["Client", "commands", "default_timeout", "job_states"]
+__all__ = ["Client", "COMMANDS", "DEFAULT_TIMEOUT", "JOB_STATES"]
 __version__ = "2021.10.0"
