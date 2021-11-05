@@ -23,7 +23,7 @@ test_requires = [
     "pytest",
     "pytest-cov",
     "pytest-env",
-    "mapchete_hub",
+    "mapchete_hub>=2021.11.0",
 ]
 
 setup(

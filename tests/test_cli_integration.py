@@ -52,6 +52,23 @@ def test_execute(mhub_integration_client, cli, example_config_mapchete):
     not ENDPOINT_AVAILABLE,
     reason="requires up and running endpoint using docker-compose",
 )
+def test_execute_dask_spec_json(
+    mhub_integration_client, cli, example_config_mapchete, custom_dask_specs_json
+):
+    result = cli.run(
+        f"execute {example_config_mapchete.path} --dask-specs {custom_dask_specs_json} --tile 8 0 0"
+    )
+    assert result.exit_code == 0
+    job_id = result.output.strip()
+
+    job = mhub_integration_client.job(job_id)
+    assert job.properties["dask_specs"].get("worker_threads") == 2
+
+
+@pytest.mark.skipif(
+    not ENDPOINT_AVAILABLE,
+    reason="requires up and running endpoint using docker-compose",
+)
 def test_execute_progress(mhub_integration_client, cli, example_config_mapchete):
     job_name = uuid4().hex
     result = cli.run(

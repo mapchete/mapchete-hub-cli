@@ -24,6 +24,12 @@ def _set_debug_log_level(ctx, param, debug):
 
 
 def _check_dask_specs(ctx, param, dask_specs):
+    # read from JSON config
+    if dask_specs.endswith(".json"):
+        with open(dask_specs, "r") as src:
+            return json.loads(src.read())
+
+    # use one of the presets
     res = Client(**ctx.obj).get("dask_specs")
     if res.status_code != 200:  # pragma: no cover
         raise ConnectionError(res.json())

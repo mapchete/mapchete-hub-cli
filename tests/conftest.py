@@ -4,7 +4,7 @@ from dask.distributed import LocalCluster
 from fastapi.testclient import TestClient
 import os
 import pytest
-from mapchete_hub.app import app, get_backend_db, get_dask
+from mapchete_hub.app import app, get_backend_db, get_dask_opts
 from mapchete_hub.db import BackendDB
 import mongomock.database
 import yaml
@@ -14,6 +14,8 @@ from mapchete_hub_cli.cli import mhub
 
 _fake_backend_db = BackendDB(mongomock.MongoClient())
 _dask_cluster = LocalCluster()
+
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 def fake_backend_db():
@@ -25,7 +27,7 @@ def local_dask_cluster():
 
 
 app.dependency_overrides[get_backend_db] = fake_backend_db
-app.dependency_overrides[get_dask] = local_dask_cluster
+app.dependency_overrides[get_dask_opts] = local_dask_cluster
 
 
 @pytest.fixture(scope="session")
@@ -174,3 +176,8 @@ def example_config_mapchete(tmpdir):
     with open(temp_config_path, "w") as dst:
         dst.write(yaml.dump(config))
     return ExampleConfig(temp_config_path, config)
+
+
+@pytest.fixture
+def custom_dask_specs_json():
+    return os.path.join(SCRIPT_DIR, "custom_dask_specs.json")
