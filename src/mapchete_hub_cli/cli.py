@@ -210,6 +210,18 @@ opt_dask_specs = click.option(
     default="default",
     help="Choose worker performance class.",
 )
+opt_dask_max_submitted_tasks = click.option(
+    "--dask-max-submitted-tasks",
+    type=click.INT,
+    default=500,
+    help="Limit number of tasks being submitted to dask scheduler at once.",
+)
+opt_dask_chunksize = click.option(
+    "--dask-chunksize",
+    type=click.INT,
+    default=100,
+    help="Number tasks being submitted per request to dask scheduler at once.",
+)
 opt_since = click.option(
     "--since",
     type=click.STRING,
@@ -328,7 +340,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
                 else:
                     yield j.job_id
 
-        job_ids = [j for j in _yield_revokable_jobs(jobs)]
+        job_ids = list(_yield_revokable_jobs(jobs))
 
         if not job_ids:  # pragma: no cover
             click.echo("No revokable jobs found.")
@@ -359,6 +371,8 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
 @opt_overwrite
 @opt_verbose
 @opt_dask_specs
+@opt_dask_max_submitted_tasks
+@opt_dask_chunksize
 @opt_debug
 @opt_job_name
 @click.pass_context
@@ -376,6 +390,11 @@ def execute(ctx, mapchete_files, overwrite=False, verbose=False, debug=False, **
             )
             if verbose:  # pragma: no cover
                 click.echo(f"job {job.job_id} {job.state}")
+                job = Client(**ctx.obj).job(job.job_id)
+                if job.properties.get("dask_dashboard_link"):
+                    click.echo(
+                        f"dask dashboard: {job.properties.get('dask_dashboard_link')}"
+                    )
                 _show_progress(ctx, job.job_id, disable=debug)
             else:
                 click.echo(job.job_id)
@@ -392,6 +411,7 @@ def execute(ctx, mapchete_files, overwrite=False, verbose=False, debug=False, **
 @click.option("--traceback", is_flag=True, help="Print only traceback if available.")
 @click.option("--show-config", is_flag=True, help="Print Mapchete config.")
 @click.option("--show-params", is_flag=True, help="Print Mapchete parameters.")
+@click.option("--show-process", is_flag=True, help="Print Mapchete process.")
 @opt_progress
 @opt_debug
 @click.pass_context
@@ -401,6 +421,7 @@ def job(
     geojson=False,
     show_config=False,
     show_params=False,
+    show_process=False,
     traceback=False,
     progress=False,
     debug=False,
@@ -425,6 +446,14 @@ def job(
                 else:
                     click.echo(f"{k}: {v}")
             return
+        elif show_process:
+            process = job.to_dict()["properties"]["mapchete"]["config"].get("process")
+            if isinstance(process, list):
+                for line in process:
+                    click.echo(line)
+            else:
+                click.echo(process)
+            return
         elif traceback:  # pragma: no cover
             click.echo(job.to_dict()["properties"].get("exception"))
             click.echo(job.to_dict()["properties"].get("traceback"))
@@ -433,6 +462,27 @@ def job(
             _show_progress(ctx, job_id, disable=debug)
         else:
             _print_job_details(job, metadata_items=metadata_items, verbose=True)
+    except Exception as e:  # pragma: no cover
+        if debug:
+            raise
+        raise click.ClickException(e)
+
+
+@mhub.command(
+    short_help="Show job progress. Shorthand for mhub job <job_id> --progress"
+)
+@click.argument("job_id", type=click.STRING)
+@opt_debug
+@click.pass_context
+def progress(
+    ctx,
+    job_id,
+    debug=False,
+):
+    try:
+        job = Client(**ctx.obj).job(job_id)
+        click.echo(f"job {job.job_id} {job.state}")
+        _show_progress(ctx, job_id, disable=debug)
     except Exception as e:  # pragma: no cover
         if debug:
             raise
@@ -670,6 +720,9 @@ def _print_job_details(job, metadata_items=None, verbose=False):
         total = job.properties.get("total_progress")
         progress = round(100 * current / total, 2) if total else 0.0
         click.echo(f"progress: {progress}%")
+
+        # dask_dashboard_link
+        click.echo(f"dask dashboard: {job.properties.get('dask_dashboard_link')}")
 
         # command
         click.echo(f"command: {job.properties.get('command')}")
