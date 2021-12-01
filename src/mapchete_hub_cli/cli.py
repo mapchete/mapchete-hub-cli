@@ -213,7 +213,7 @@ opt_dask_specs = click.option(
 opt_dask_max_submitted_tasks = click.option(
     "--dask-max-submitted-tasks",
     type=click.INT,
-    default=500,
+    default=1000,
     help="Limit number of tasks being submitted to dask scheduler at once.",
 )
 opt_dask_chunksize = click.option(
