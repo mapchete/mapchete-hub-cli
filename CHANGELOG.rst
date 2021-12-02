@@ -3,6 +3,16 @@ Changelog
 #########
 
 ----------------------
+2021.12.0 - 2021-12-02
+----------------------
+
+    * CLI
+        * enable passing on dask_max_submitted_tasks and dask_chunksize
+        * reintroduce ``progress`` command
+        * add ``--show-process`` flag
+        * print dask dashboard on default
+
+----------------------
 2021.11.0 - 2021-11-05
 ----------------------
 
