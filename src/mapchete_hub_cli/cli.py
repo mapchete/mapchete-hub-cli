@@ -448,11 +448,9 @@ def job(
             return
         elif show_process:
             process = job.to_dict()["properties"]["mapchete"]["config"].get("process")
-            if isinstance(process, list):
-                for line in process:
-                    click.echo(line)
-            else:
-                click.echo(process)
+            process = process if isinstance(process, list) else [process]
+            for line in process:
+                click.echo(line)
             return
         elif traceback:  # pragma: no cover
             click.echo(job.to_dict()["properties"].get("exception"))

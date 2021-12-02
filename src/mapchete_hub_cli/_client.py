@@ -142,9 +142,9 @@ class Client:
             end = time.time()
             logger.debug(f"response: {res}")
             logger.debug(f"response took {round(end - start, 3)}s")
-            if res.status_code == 401:
+            if res.status_code == 401:  # pragma: no cover
                 raise HTTPError("Authorization failure")
-            elif res.status_code >= 500:
+            elif res.status_code >= 500:  # pragma: no cover
                 logger.error(f"response text: {res.text}")
             return res
         except ConnectionError:  # pragma: no cover
