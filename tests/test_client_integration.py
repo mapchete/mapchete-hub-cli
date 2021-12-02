@@ -81,7 +81,7 @@ def test_job(mhub_integration_client, example_config_json):
 def test_job_state(mhub_integration_client, example_config_json):
     """Return job state."""
     job = mhub_integration_client.start_job(**example_config_json)
-    assert mhub_integration_client.job_state(job.job_id) == "running"
+    assert mhub_integration_client.job_state(job.job_id) in ["running", "pending"]
 
 
 @pytest.mark.skipif(

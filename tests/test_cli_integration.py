@@ -108,6 +108,20 @@ def test_execute_errors(cli, example_config_mapchete):
     not ENDPOINT_AVAILABLE,
     reason="requires up and running endpoint using docker-compose",
 )
+def test_progress(mhub_integration_client, cli, example_config_mapchete):
+    job_name = uuid4().hex
+    result = cli.run(f"execute {example_config_mapchete.path} --job-name {job_name}")
+    assert result.exit_code == 0
+    job_id = result.output.strip()
+
+    result = cli.run(f"progress {job_id}")
+    assert result.exit_code == 0
+
+
+@pytest.mark.skipif(
+    not ENDPOINT_AVAILABLE,
+    reason="requires up and running endpoint using docker-compose",
+)
 def test_cancel_by_job_id(mhub_integration_client, cli, example_config_mapchete):
     # execute job
     result = cli.run(f"execute {example_config_mapchete.path}")
@@ -163,6 +177,21 @@ def test_job(mhub_integration_client, cli, example_config_mapchete):
     result = cli.run(f"job {job_id} --geojson")
     assert result.exit_code == 0
     assert "Feature" in result.output
+
+    # print job config
+    result = cli.run(f"job {job_id} --show-config")
+    assert result.exit_code == 0
+    assert "output" in result.output
+
+    # print job params
+    result = cli.run(f"job {job_id} --show-params")
+    assert result.exit_code == 0
+    assert "bounds" in result.output
+
+    # print job process
+    result = cli.run(f"job {job_id} --show-process")
+    assert result.exit_code == 0
+    assert "mapchete.processes.convert" in result.output
 
 
 @pytest.mark.skipif(
@@ -232,6 +261,9 @@ def test_jobs_print(cli):
     assert result.exit_code == 0
 
     result = cli.run("jobs --geojson")
+    assert result.exit_code == 0
+
+    result = cli.run("jobs -i runtime")
     assert result.exit_code == 0
 
 
