@@ -222,6 +222,11 @@ opt_dask_chunksize = click.option(
     default=100,
     help="Number tasks being submitted per request to dask scheduler at once.",
 )
+opt_dask_no_task_graph = click.option(
+    "--dask-no-task-graph",
+    is_flag=True,
+    help="Don't compute task graph when using dask.",
+)
 opt_since = click.option(
     "--since",
     type=click.STRING,
@@ -373,10 +378,19 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
 @opt_dask_specs
 @opt_dask_max_submitted_tasks
 @opt_dask_chunksize
+@opt_dask_no_task_graph
 @opt_debug
 @opt_job_name
 @click.pass_context
-def execute(ctx, mapchete_files, overwrite=False, verbose=False, debug=False, **kwargs):
+def execute(
+    ctx,
+    mapchete_files,
+    overwrite=False,
+    verbose=False,
+    debug=False,
+    dask_no_task_graph=False,
+    **kwargs,
+):
     """Execute a process."""
     for mapchete_file in mapchete_files:
         try:
@@ -386,6 +400,7 @@ def execute(ctx, mapchete_files, overwrite=False, verbose=False, debug=False, **
                 params=dict(
                     kwargs,
                     mode="overwrite" if overwrite else "continue",
+                    dask_compute_graph=not dask_no_task_graph,
                 ),
             )
             if verbose:  # pragma: no cover
