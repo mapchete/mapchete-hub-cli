@@ -7,7 +7,7 @@ services:
       context: .
       args:
         BASE_IMAGE: registry.gitlab.eox.at/maps/mapchete_hub/mhub
-        BASE_IMAGE_TAG: "2021.11.0"
+        BASE_IMAGE_TAG: "2022.2.1"
         EOX_PYPI_TOKEN: ${EOX_PYPI_TOKEN}
     depends_on:
       - server
