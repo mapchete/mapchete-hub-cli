@@ -4,7 +4,7 @@ from dask.distributed import LocalCluster
 from fastapi.testclient import TestClient
 import os
 import pytest
-from mapchete_hub.app import app, get_backend_db, get_dask_opts
+from mapchete_hub.app import app, get_backend_db, get_dask_cluster_setup
 from mapchete_hub.db import BackendDB
 import mongomock.database
 import yaml
@@ -27,7 +27,7 @@ def local_dask_cluster():
 
 
 app.dependency_overrides[get_backend_db] = fake_backend_db
-app.dependency_overrides[get_dask_opts] = local_dask_cluster
+app.dependency_overrides[get_dask_cluster_setup] = local_dask_cluster
 
 
 @pytest.fixture(scope="session")
