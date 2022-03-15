@@ -16,7 +16,7 @@ services:
     command: [ "--bind_ip_all" ]
 
   server:
-    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:2021.12.0
+    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:2022.2.1
     depends_on:
       - dask_scheduler
       - db
