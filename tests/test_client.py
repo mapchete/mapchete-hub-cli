@@ -15,6 +15,10 @@ def test_get_root(mhub_client):
     assert response.json()
 
 
+def test_remote_version(mhub_client):
+    assert mhub_client.remote_version
+
+
 def test_start_job(mhub_client, example_config_json):
     """Start a job and return job state."""
     job = mhub_client.start_job(**example_config_json)

@@ -28,6 +28,16 @@ def test_cli(cli):
     not ENDPOINT_AVAILABLE,
     reason="requires up and running endpoint using docker-compose",
 )
+def test_remote_versions(cli):
+    result = cli.run("--remote-versions")
+    assert result.exit_code == 0
+    assert "20" in result.output
+
+
+@pytest.mark.skipif(
+    not ENDPOINT_AVAILABLE,
+    reason="requires up and running endpoint using docker-compose",
+)
 def test_dask_specs(cli):
     result = cli.run("dask-specs")
     assert result.exit_code == 0
