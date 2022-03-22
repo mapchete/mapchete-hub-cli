@@ -124,6 +124,11 @@ class Client:
         self._client = _test_client if _test_client else requests
         self._baseurl = "" if _test_client else host
 
+    @property
+    def remote_version(self):
+        response = self.get("", timeout=self.timeout).json()
+        return response.get("versions", response.get("title", "").split(" ")[-1])
+
     def _request(self, request_type, url, **kwargs):
         _request_func = {
             "GET": self._client.get,
@@ -381,6 +386,9 @@ class Client:
         if self._test_client:  # pragma: no cover
             kwargs.pop("timeout", None)
         return dict(kwargs, auth=(self._user, self._password))
+
+    def __repr__(self):  # pragma: no cover
+        return f"Client(host={self.host}, user={self._user}, password={self._password})"
 
 
 def load_mapchete_config(mapchete_config, basedir=None):

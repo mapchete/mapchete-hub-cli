@@ -117,6 +117,12 @@ def _validate_zoom(ctx, param, zoom):
             raise click.BadParameter(e)
 
 
+def _remote_versions_cb(ctx, param, value):
+    if value:
+        click.echo(Client().remote_version)
+        ctx.exit()
+
+
 # click arguments and options #
 ###############################
 arg_mapchete_files = click.argument(
@@ -299,6 +305,12 @@ opt_metadata_items = click.option(
     type=click.INT,
     default=DEFAULT_TIMEOUT,
     help=f"Time in seconds to wait for server response. (default: {DEFAULT_TIMEOUT})",
+)
+@click.option(
+    "--remote-versions",
+    is_flag=True,
+    callback=_remote_versions_cb,
+    help="Show versions of installed packages on remote mapchete Hub.",
 )
 @opt_mhub_user
 @opt_mhub_password
