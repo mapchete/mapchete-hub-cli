@@ -117,9 +117,10 @@ def _validate_zoom(ctx, param, zoom):
             raise click.BadParameter(e)
 
 
-def _remote_versions_cb(ctx, *args):
-    click.echo(Client().remote_version)
-    ctx.exit()
+def _remote_versions_cb(ctx, param, value):
+    if value:
+        click.echo(Client().remote_version)
+        ctx.exit()
 
 
 # click arguments and options #
