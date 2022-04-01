@@ -9,6 +9,6 @@ License
 
 MIT License
 
-Copyright (c) 2018 - 2021 `EOX IT Services`_
+Copyright (c) 2018 - 2022 `EOX IT Services`_
 
 .. _`EOX IT Services`: https://eox.at/
