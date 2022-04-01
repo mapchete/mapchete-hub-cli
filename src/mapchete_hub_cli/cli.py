@@ -233,6 +233,11 @@ opt_dask_no_task_graph = click.option(
     is_flag=True,
     help="Don't compute task graph when using dask.",
 )
+opt_dask_no_results = click.option(
+    "--dask-no-results",
+    is_flag=True,
+    help="Don't pass on task results when using dask.",
+)
 opt_since = click.option(
     "--since",
     type=click.STRING,
@@ -382,6 +387,8 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
 @mhub.command(help="Execute a process.")
 @arg_mapchete_files
 @opt_zoom
+@opt_area
+@opt_area_crs
 @opt_bounds
 @opt_point
 @opt_tile
@@ -391,6 +398,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
 @opt_dask_max_submitted_tasks
 @opt_dask_chunksize
 @opt_dask_no_task_graph
+@opt_dask_no_results
 @opt_debug
 @opt_job_name
 @click.pass_context
@@ -401,6 +409,7 @@ def execute(
     verbose=False,
     debug=False,
     dask_no_task_graph=False,
+    dask_no_results=False,
     **kwargs,
 ):
     """Execute a process."""
@@ -413,6 +422,7 @@ def execute(
                     kwargs,
                     mode="overwrite" if overwrite else "continue",
                     dask_compute_graph=not dask_no_task_graph,
+                    dask_propagate_results=not dask_no_results,
                 ),
             )
             if verbose:  # pragma: no cover
