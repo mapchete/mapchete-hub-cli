@@ -4,6 +4,16 @@ Changelog
 
 
 ---------------------
+2022.4.0 - 2022-04-01
+---------------------
+
+    * CLI
+        * add ``--dask-no-results``: don't let mhub call `Future.results()`
+        * add ``mhub --remote-versions``: show remote mhub version
+        * add ``--area`` and ``--area-crs`` options: define process area
+
+
+---------------------
 2022.3.0 - 2022-03-14
 ---------------------
 
