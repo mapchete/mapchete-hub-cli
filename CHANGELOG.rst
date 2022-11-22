@@ -3,6 +3,17 @@ Changelog
 #########
 
 
+----------------------
+2022.11.0 - 2022-04-01
+----------------------
+
+    * CLI
+        * add ``--use-old-image`` to ``mhub retry`` to force using the image the job was originally run on; per default the currently deployed image is used
+    
+    * packaging
+        * use `hatch` to build package
+
+
 ---------------------
 2022.4.0 - 2022-04-01
 ---------------------
