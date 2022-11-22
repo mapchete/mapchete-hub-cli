@@ -16,7 +16,7 @@ services:
     command: [ "--bind_ip_all" ]
 
   server:
-    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:2022.4.0
+    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:2022.11.0
     depends_on:
       - dask_scheduler
       - db
@@ -30,8 +30,8 @@ services:
       - frontend
     command:
       [
-        "uvicorn",
-        "mapchete_hub.app:app",
+        "mhub-server",
+        "start",
         "--host",
         "0.0.0.0",
         "--port",
@@ -41,12 +41,12 @@ services:
       ]
 
   dask_scheduler:
-    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:2022.4.0
+    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:2022.11.0
     networks:
       - backend
     command:
       [
-        "dask-scheduler",
+        "dask", "scheduler",
         "--host",
         "dask_scheduler",
         "--port",
@@ -54,17 +54,17 @@ services:
       ]
 
   dask_worker:
-    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:2022.4.0
+    image: registry.gitlab.eox.at/maps/mapchete_hub/mhub:2022.11.0
     depends_on:
       - dask_scheduler
     networks:
       - backend
     command:
       [
-        "dask-worker",
+        "dask", "worker",
         "--nthreads",
         "2",
-        "--nprocs",
+        "--nworkers",
         "8",
         "tcp://dask_scheduler:8786"
       ]

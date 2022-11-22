@@ -107,13 +107,11 @@ def test_list_jobs_bounds(mhub_client, example_config_json):
         **dict(example_config_json, params=dict(example_config_json["params"], zoom=2))
     ).job_id
 
-    # NotImplementedError: '$geoIntersects' is a valid operation but it is not supported by Mongomock yet.
-    with pytest.raises(NotImplementedError):
-        jobs = mhub_client.jobs(bounds=[0, 1, 2, 3])
-        assert job_id in jobs
-    with pytest.raises(NotImplementedError):
-        jobs = mhub_client.jobs(bounds=[10, 1, 12, 3])
-        assert job_id not in jobs
+    jobs = mhub_client.jobs(bounds=[0, 1, 2, 3])
+    assert job_id in jobs
+
+    jobs = mhub_client.jobs(bounds=[10, 1, 12, 3])
+    assert job_id not in jobs
 
 
 def test_list_jobs_output_path(mhub_client, example_config_json):

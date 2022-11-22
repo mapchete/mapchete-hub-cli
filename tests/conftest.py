@@ -6,13 +6,12 @@ import os
 import pytest
 from mapchete_hub.app import app, get_backend_db, get_dask_cluster_setup
 from mapchete_hub.db import BackendDB
-import mongomock.database
 import yaml
 
 from mapchete_hub_cli import Client
 from mapchete_hub_cli.cli import mhub
 
-_fake_backend_db = BackendDB(mongomock.MongoClient())
+_fake_backend_db = BackendDB("memory")
 _dask_cluster = LocalCluster()
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
