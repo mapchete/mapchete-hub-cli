@@ -1,3 +1,60 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mapchete-hub-cli"
+dynamic = ["version"]
+description = "CLI and Python bindings to mapchete Hub API."
+readme = "README.rst"
+license = "MIT"
+authors = [
+    { name = "Joachim Ungar", email = "joachim.ungar@eox.at" },
+    { name = "Petr Sevcik", email = "petr.sevcik@eox.at" }
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: GIS",
+]
+dependencies = [
+    "click",
+    "oyaml",
+    "requests",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+test = [
+    "mapchete_hub>=2021.11.0",
+    "pytest",
+    "pytest-cov",
+    "pytest-env",
+    "requests",
+]
+
+[project.scripts]
+mhub = "mapchete_hub_cli.cli:mhub"
+
+[project.entry-points."mapchete.cli.commands"]
+mhub = "mapchete_hub_cli.cli:mhub"
+
+[project.urls]
+Homepage = "https://gitlab.eox.at/maps/mapchete_hub_cli"
+
+[tool.hatch.version]
+path = "src/mapchete_hub_cli/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+]
+
 [tool.black]
 include = '\.pyi?$'
 exclude = '''
