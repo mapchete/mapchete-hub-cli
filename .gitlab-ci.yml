@@ -24,7 +24,7 @@ test_wheel:
   needs: ["build_python"]
   stage: test
   script:
-    - pip install `ls dist/mapchete_eo*.tar.gz -1 | head -1`[test]
+    - pip install `ls dist/mapchete_hub_cli*.tar.gz -1 | head -1`[test]
     - mhub --help
     - pytest -v --cov=mapchete_hub_cli tests/
 
@@ -33,7 +33,7 @@ test_tar:
   needs: ["build_python"]
   stage: test
   script:
-    - pip install `ls dist/mapchete_eo*.tar.gz -1 | head -1`[test]
+    - pip install `ls dist/mapchete_hub_cli*.tar.gz -1 | head -1`[test]
     - mhub --help
     - pytest -v --cov=mapchete_hub_cli tests/
 
