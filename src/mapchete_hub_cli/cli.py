@@ -645,6 +645,9 @@ def dask_specs(ctx, **kwargs):
 
 @mhub.command(short_help="Retry jobs.")
 @opt_job_ids
+@click.option(
+    "--use-old-image", is_flag=True, help="Force to rerun Job on image from first run."
+)
 @opt_output_path
 @opt_state
 @opt_command
@@ -661,6 +664,7 @@ def dask_specs(ctx, **kwargs):
 def retry(
     ctx,
     job_ids=None,
+    use_old_image=False,
     overwrite=False,
     verbose=False,
     force=False,
@@ -701,7 +705,7 @@ def retry(
             f"Do you really want to retry {len(job_ids)} job(s)?", abort=True
         ):
             for job_id in job_ids:
-                job = Client(**ctx.obj).retry_job(job_id)
+                job = Client(**ctx.obj).retry_job(job_id, use_old_image=use_old_image)
                 click.echo(f"job {job.job_id} {job.state}")
     except Exception as e:  # pragma: no cover
         if debug:

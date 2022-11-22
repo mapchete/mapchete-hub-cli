@@ -213,7 +213,7 @@ class Client:
         if command not in COMMANDS:  # pragma: no cover
             raise ValueError(f"invalid command given: {command}")
 
-        logger.debug(f"send job to API")
+        logger.debug("send job to API")
         res = self.post(
             f"processes/{command}/execution", data=json.dumps(job), timeout=self.timeout
         )
@@ -247,7 +247,7 @@ class Client:
             _client=self,
         )
 
-    def retry_job(self, job_id):
+    def retry_job(self, job_id, use_old_image=False):
         """
         Retry a job and its children and return job state.
 
@@ -259,10 +259,18 @@ class Client:
         mapchete_hub.api.Job
         """
         existing_job = self.job(job_id)
+        params = existing_job.to_dict()["properties"]["mapchete"]["params"].copy()
+        if not use_old_image:
+            # make sure to remove image from params because otherwise the job will be retried
+            # using outdated software
+            try:
+                params["dask_specs"].pop("image")
+            except KeyError:
+                pass
         return self.start_job(
             config=existing_job.to_dict()["properties"]["mapchete"]["config"],
             command=existing_job.to_dict()["properties"]["mapchete"]["command"],
-            params=existing_job.to_dict()["properties"]["mapchete"]["params"],
+            params=params,
         )
 
     def job(self, job_id, geojson=False, indent=4):
