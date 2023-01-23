@@ -64,7 +64,7 @@ class Job:
 
     def __repr__(self):  # pragma: no cover
         """Print Job."""
-        return f"Job(status_code={self.status_code}, state={self.state}, job_id={self.job_id}, dict={self.to_dict()}"
+        return f"Job(status_code={self.status_code}, state={self.state}, job_id={self.job_id}, updated={self.properties.get('updated')}"
 
     def wait(self, wait_for_max=None, raise_exc=True):
         """Block until job has finished processing."""
@@ -275,6 +275,18 @@ class Client:
 
     def job(self, job_id, geojson=False, indent=4):
         """Return job metadata."""
+        if job_id == ":last:":
+            one_day_ago = (
+                datetime.datetime.utcnow() - datetime.timedelta(days=1)
+            ).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            jobs = [j[1] for j in self.jobs(from_date=one_day_ago).items()]
+            if len(jobs) == 0:  # pragma: no cover
+                raise JobNotFound("cannot find recent job in the past day")
+            last_job = list(
+                sorted(jobs, key=lambda x: x.properties.get("updated") or 0.0)
+            )[-1]
+            job_id = last_job.job_id
+
         res = self.get(f"jobs/{job_id}", timeout=self.timeout)
         if res.status_code == 404:
             raise JobNotFound(f"job {job_id} does not exist")
