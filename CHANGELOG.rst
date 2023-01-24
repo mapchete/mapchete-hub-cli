@@ -3,6 +3,14 @@ Changelog
 #########
 
 
+---------------------
+2023.1.0 - 2023-01-24
+---------------------
+
+    * CLI
+        * add allow submitting `:last:` instead of a job_id so mhub will automatically find the most recently updated job
+
+
 ----------------------
 2022.11.0 - 2022-04-01
 ----------------------
