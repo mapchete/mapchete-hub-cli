@@ -261,7 +261,7 @@ opt_job_ids = click.option(
     "--job-ids",
     "-j",
     type=click.STRING,
-    help="One or multiple job IDs separated by comma.",
+    help="One or multiple job IDs separated by comma. If a job_id is ':last:', the CLI will automatically determine the most recently updated job.",
     callback=_expand_str_list,
 )
 opt_force = click.option("--force", "-f", is_flag=True, help="Don't ask, just do.")
@@ -465,7 +465,12 @@ def job(
     metadata_items=None,
     **kwargs,
 ):
-    """Show job status."""
+    """
+    Show job status.
+
+    JOB_ID can either be a valid job ID or :last:, in which case the CLI will automatically
+    determine the most recently updated job.
+    """
     try:
         job = Client(**ctx.obj).job(job_id, geojson=geojson)
         if geojson:  # pragma: no cover
@@ -514,6 +519,12 @@ def progress(
     job_id,
     debug=False,
 ):
+    """
+    Show job progress using a progress bar.
+
+    JOB_ID can either be a valid job ID or :last:, in which case the CLI will automatically
+    determine the most recently updated job.
+    """
     try:
         job = Client(**ctx.obj).job(job_id)
         click.echo(f"job {job.job_id} {job.state}")

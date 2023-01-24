@@ -76,6 +76,13 @@ def test_retry_job(mhub_client, example_config_json):
     assert retried_job.status_code == 201
 
 
+def test_retry_last_job(mhub_client, example_config_json):
+    """Retry a job and return job state."""
+    mhub_client.start_job(**example_config_json)
+    retried_job = mhub_client.retry_job(":last:")
+    assert retried_job.status_code == 201
+
+
 def test_job(mhub_client, example_config_json):
     """Return job metadata."""
     job = mhub_client.start_job(**example_config_json)
@@ -90,6 +97,12 @@ def test_job_state(mhub_client, example_config_json):
     """Return job state."""
     job = mhub_client.start_job(**example_config_json)
     assert mhub_client.job_state(job.job_id) == "done"
+
+
+def test_last_job_state(mhub_client, example_config_json):
+    """Return job state."""
+    mhub_client.start_job(**example_config_json)
+    assert mhub_client.job_state(":last:") == "done"
 
 
 def test_job_states(mhub_client, example_config_json):
