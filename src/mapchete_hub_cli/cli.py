@@ -512,12 +512,20 @@ def job(
     short_help="Show job progress. Shorthand for mhub job <job_id> --progress"
 )
 @click.argument("job_id", type=click.STRING)
+@click.option(
+    "--interval",
+    "-i",
+    type=click.FLOAT,
+    default=0.3,
+    help="Request interval in seconds.",
+)
 @opt_debug
 @click.pass_context
 def progress(
     ctx,
     job_id,
     debug=False,
+    interval=None,
 ):
     """
     Show job progress using a progress bar.
@@ -528,7 +536,7 @@ def progress(
     try:
         job = Client(**ctx.obj).job(job_id)
         click.echo(f"job {job.job_id} {job.state}")
-        _show_progress(ctx, job_id, disable=debug)
+        _show_progress(ctx, job_id, disable=debug, interval=interval)
     except Exception as e:  # pragma: no cover
         if debug:
             raise
@@ -808,9 +816,11 @@ def _print_job_details(job, metadata_items=None, verbose=False):
         click.echo("")
 
 
-def _show_progress(ctx, job_id, disable=False):
+def _show_progress(ctx, job_id, disable=False, interval=0.3):
     try:
-        progress_iter = Client(**ctx.obj).job(job_id).progress(smooth=True)
+        progress_iter = (
+            Client(**ctx.obj).job(job_id).progress(smooth=True, interval=interval)
+        )
         click.echo("wait for job progress...")
         i = next(progress_iter)
         last_progress = i["current_progress"]
