@@ -30,7 +30,6 @@ Changelog
     * packaging
         * use `hatch` to build package
 
->>>>>>> CHANGELOG.rst
 
 ---------------------
 2022.4.0 - 2022-04-01
