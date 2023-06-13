@@ -1,5 +1,5 @@
 ARG BASE_IMAGE=registry.gitlab.eox.at/maps/mapchete_hub/mhub
-ARG BASE_IMAGE_TAG=2022.2.1
+ARG BASE_IMAGE_TAG=2022.11.0
 
 FROM ${BASE_IMAGE}:${BASE_IMAGE_TAG}
 

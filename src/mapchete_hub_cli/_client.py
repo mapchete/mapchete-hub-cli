@@ -64,7 +64,7 @@ class Job:
 
     def __repr__(self):  # pragma: no cover
         """Print Job."""
-        return f"Job(status_code={self.status_code}, state={self.state}, job_id={self.job_id}, dict={self.to_dict()}"
+        return f"Job(status_code={self.status_code}, state={self.state}, job_id={self.job_id}, updated={self.properties.get('updated')}"
 
     def wait(self, wait_for_max=None, raise_exc=True):
         """Block until job has finished processing."""
@@ -167,6 +167,21 @@ class Client:
         """Make a DELETE request to _test_client or host."""
         return self._request("DELETE", url, **kwargs)
 
+    def get_last_job_id(self):
+        """
+        Return ID of latest job if requested.
+        """
+        one_day_ago = (
+            datetime.datetime.utcnow() - datetime.timedelta(days=1)
+        ).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        jobs = [j[1] for j in self.jobs(from_date=one_day_ago).items()]
+        if len(jobs) == 0:  # pragma: no cover
+            raise JobNotFound("cannot find recent job in the past day")
+        last_job = list(sorted(jobs, key=lambda x: x.properties.get("updated") or 0.0))[
+            -1
+        ]
+        return last_job.job_id
+
     def start_job(self, command="execute", config=None, params=None, basedir=None):
         """
         Start a job and return job state.
@@ -213,7 +228,7 @@ class Client:
         if command not in COMMANDS:  # pragma: no cover
             raise ValueError(f"invalid command given: {command}")
 
-        logger.debug(f"send job to API")
+        logger.debug("send job to API")
         res = self.post(
             f"processes/{command}/execution", data=json.dumps(job), timeout=self.timeout
         )
@@ -235,7 +250,17 @@ class Client:
             )
 
     def cancel_job(self, job_id):
-        """Cancel existing job."""
+        """
+        Cancel existing job.
+
+        Parameters
+        ----------
+        job_id : str
+            Can either be a valid job ID or :last:, in which case the CLI will automatically
+            determine the most recently updated job.
+        """
+        if job_id == ":last:":
+            job_id = self.get_last_job_id()
         res = self.delete(f"jobs/{job_id}", timeout=self.timeout)
         if res.status_code == 404:
             raise JobNotFound(f"job {job_id} does not exist")
@@ -247,26 +272,52 @@ class Client:
             _client=self,
         )
 
-    def retry_job(self, job_id):
+    def retry_job(self, job_id, use_old_image=False):
         """
         Retry a job and its children and return job state.
 
         Sends HTTP POST to /jobs/<job_id> and appends mapchete configuration as well
         as processing parameters as JSON.
 
+        Parameters
+        ----------
+        job_id : str
+            Can either be a valid job ID or :last:, in which case the CLI will automatically
+            determine the most recently updated job.
+
         Returns
         -------
         mapchete_hub.api.Job
         """
+        if job_id == ":last:":
+            job_id = self.get_last_job_id()
         existing_job = self.job(job_id)
+        params = existing_job.to_dict()["properties"]["mapchete"]["params"].copy()
+        if not use_old_image:
+            # make sure to remove image from params because otherwise the job will be retried
+            # using outdated software
+            try:
+                params["dask_specs"].pop("image")
+            except KeyError:
+                pass
         return self.start_job(
             config=existing_job.to_dict()["properties"]["mapchete"]["config"],
             command=existing_job.to_dict()["properties"]["mapchete"]["command"],
-            params=existing_job.to_dict()["properties"]["mapchete"]["params"],
+            params=params,
         )
 
     def job(self, job_id, geojson=False, indent=4):
-        """Return job metadata."""
+        """
+        Return job metadata.
+
+        Parameters
+        ----------
+        job_id : str
+            Can either be a valid job ID or :last:, in which case the CLI will automatically
+            determine the most recently updated job.
+        """
+        if job_id == ":last:":
+            job_id = self.get_last_job_id()
         res = self.get(f"jobs/{job_id}", timeout=self.timeout)
         if res.status_code == 404:
             raise JobNotFound(f"job {job_id} does not exist")
@@ -284,7 +335,17 @@ class Client:
             )
 
     def job_state(self, job_id):
-        """Return job state."""
+        """
+        Return job state.
+
+        Parameters
+        ----------
+        job_id : str
+            Can either be a valid job ID or :last:, in which case the CLI will automatically
+            determine the most recently updated job.
+        """
+        if job_id == ":last:":
+            job_id = self.get_last_job_id()
         return self.job(job_id).state
 
     def jobs(self, geojson=False, indent=4, bounds=None, **kwargs):
@@ -324,7 +385,17 @@ class Client:
         }
 
     def job_progress(self, job_id, interval=0.3, wait_for_max=None, raise_exc=True):
-        """Yield job progress information."""
+        """
+        Yield job progress information.
+
+        Parameters
+        ----------
+        job_id : str
+            Can either be a valid job ID or :last:, in which case the CLI will automatically
+            determine the most recently updated job.
+        """
+        if job_id == ":last:":
+            job_id = self.get_last_job_id()
         start = time.time()
         last_progress = 0
         while True:

@@ -3,12 +3,34 @@ Changelog
 #########
 
 
+
 ---------------------
 2023.6.0 - 2023-06-13
 ---------------------
 
     * core
         * add `initializing` and `created` Job states available via `mapchete_hub>=2023.6.4`
+
+
+---------------------
+2023.1.0 - 2023-01-24
+---------------------
+
+    * CLI
+        * add allow submitting `:last:` instead of a job_id so mhub will automatically find the most recently updated job
+
+
+----------------------
+2022.11.0 - 2022-04-01
+----------------------
+
+    * CLI
+        * add ``--use-old-image`` to ``mhub retry`` to force using the image the job was originally run on; per default the currently deployed image is used
+    
+    * packaging
+        * use `hatch` to build package
+
+>>>>>>> CHANGELOG.rst
 
 ---------------------
 2022.4.0 - 2022-04-01

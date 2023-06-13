@@ -261,7 +261,7 @@ opt_job_ids = click.option(
     "--job-ids",
     "-j",
     type=click.STRING,
-    help="One or multiple job IDs separated by comma.",
+    help="One or multiple job IDs separated by comma. If a job_id is ':last:', the CLI will automatically determine the most recently updated job.",
     callback=_expand_str_list,
 )
 opt_force = click.option("--force", "-f", is_flag=True, help="Don't ask, just do.")
@@ -465,7 +465,12 @@ def job(
     metadata_items=None,
     **kwargs,
 ):
-    """Show job status."""
+    """
+    Show job status.
+
+    JOB_ID can either be a valid job ID or :last:, in which case the CLI will automatically
+    determine the most recently updated job.
+    """
     try:
         job = Client(**ctx.obj).job(job_id, geojson=geojson)
         if geojson:  # pragma: no cover
@@ -507,17 +512,31 @@ def job(
     short_help="Show job progress. Shorthand for mhub job <job_id> --progress"
 )
 @click.argument("job_id", type=click.STRING)
+@click.option(
+    "--interval",
+    "-i",
+    type=click.FLOAT,
+    default=0.3,
+    help="Request interval in seconds.",
+)
 @opt_debug
 @click.pass_context
 def progress(
     ctx,
     job_id,
     debug=False,
+    interval=None,
 ):
+    """
+    Show job progress using a progress bar.
+
+    JOB_ID can either be a valid job ID or :last:, in which case the CLI will automatically
+    determine the most recently updated job.
+    """
     try:
         job = Client(**ctx.obj).job(job_id)
         click.echo(f"job {job.job_id} {job.state}")
-        _show_progress(ctx, job_id, disable=debug)
+        _show_progress(ctx, job_id, disable=debug, interval=interval)
     except Exception as e:  # pragma: no cover
         if debug:
             raise
@@ -645,6 +664,9 @@ def dask_specs(ctx, **kwargs):
 
 @mhub.command(short_help="Retry jobs.")
 @opt_job_ids
+@click.option(
+    "--use-old-image", is_flag=True, help="Force to rerun Job on image from first run."
+)
 @opt_output_path
 @opt_state
 @opt_command
@@ -661,6 +683,7 @@ def dask_specs(ctx, **kwargs):
 def retry(
     ctx,
     job_ids=None,
+    use_old_image=False,
     overwrite=False,
     verbose=False,
     force=False,
@@ -701,7 +724,7 @@ def retry(
             f"Do you really want to retry {len(job_ids)} job(s)?", abort=True
         ):
             for job_id in job_ids:
-                job = Client(**ctx.obj).retry_job(job_id)
+                job = Client(**ctx.obj).retry_job(job_id, use_old_image=use_old_image)
                 click.echo(f"job {job.job_id} {job.state}")
     except Exception as e:  # pragma: no cover
         if debug:
@@ -795,9 +818,11 @@ def _print_job_details(job, metadata_items=None, verbose=False):
         click.echo("")
 
 
-def _show_progress(ctx, job_id, disable=False):
+def _show_progress(ctx, job_id, disable=False, interval=0.3):
     try:
-        progress_iter = Client(**ctx.obj).job(job_id).progress(smooth=True)
+        progress_iter = (
+            Client(**ctx.obj).job(job_id).progress(smooth=True, interval=interval)
+        )
         click.echo("wait for job progress...")
         i = next(progress_iter)
         last_progress = i["current_progress"]

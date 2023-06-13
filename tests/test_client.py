@@ -76,6 +76,13 @@ def test_retry_job(mhub_client, example_config_json):
     assert retried_job.status_code == 201
 
 
+def test_retry_last_job(mhub_client, example_config_json):
+    """Retry a job and return job state."""
+    mhub_client.start_job(**example_config_json)
+    retried_job = mhub_client.retry_job(":last:")
+    assert retried_job.status_code == 201
+
+
 def test_job(mhub_client, example_config_json):
     """Return job metadata."""
     job = mhub_client.start_job(**example_config_json)
@@ -90,6 +97,12 @@ def test_job_state(mhub_client, example_config_json):
     """Return job state."""
     job = mhub_client.start_job(**example_config_json)
     assert mhub_client.job_state(job.job_id) == "done"
+
+
+def test_last_job_state(mhub_client, example_config_json):
+    """Return job state."""
+    mhub_client.start_job(**example_config_json)
+    assert mhub_client.job_state(":last:") == "done"
 
 
 def test_job_states(mhub_client, example_config_json):
@@ -107,13 +120,11 @@ def test_list_jobs_bounds(mhub_client, example_config_json):
         **dict(example_config_json, params=dict(example_config_json["params"], zoom=2))
     ).job_id
 
-    # NotImplementedError: '$geoIntersects' is a valid operation but it is not supported by Mongomock yet.
-    with pytest.raises(NotImplementedError):
-        jobs = mhub_client.jobs(bounds=[0, 1, 2, 3])
-        assert job_id in jobs
-    with pytest.raises(NotImplementedError):
-        jobs = mhub_client.jobs(bounds=[10, 1, 12, 3])
-        assert job_id not in jobs
+    jobs = mhub_client.jobs(bounds=[0, 1, 2, 3])
+    assert job_id in jobs
+
+    jobs = mhub_client.jobs(bounds=[10, 1, 12, 3])
+    assert job_id not in jobs
 
 
 def test_list_jobs_output_path(mhub_client, example_config_json):
