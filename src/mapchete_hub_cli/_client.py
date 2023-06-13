@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = 5
 JOB_STATES = {
-    "todo": ["pending"],
-    "doing": ["running", "aborting"],
+    "todo": ["pending", "created"],
+    "doing": ["initializing", "running", "aborting"],
     "done": ["done", "failed", "cancelled"],
 }
 COMMANDS = ["execute"]

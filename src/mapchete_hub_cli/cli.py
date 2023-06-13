@@ -758,6 +758,8 @@ def _print_job_details(job, metadata_items=None, verbose=False):
                     color = "red"
                 elif state in ["aborting", "cancelled"]:
                     color = "magenta"
+                else:
+                    color = "white"
     mapchete_config = job.properties.get("mapchete", {}).get("config", {})
 
     # job ID and job state
