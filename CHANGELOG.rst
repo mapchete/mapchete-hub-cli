@@ -4,6 +4,13 @@ Changelog
 
 
 ---------------------
+2023.6.0 - 2023-06-13
+---------------------
+
+    * core
+        * add `initializing` and `created` Job states available via `mapchete_hub>=2023.6.4`
+
+---------------------
 2022.4.0 - 2022-04-01
 ---------------------
 
