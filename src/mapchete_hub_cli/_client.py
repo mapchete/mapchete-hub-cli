@@ -30,7 +30,7 @@ from mapchete_hub_cli.exceptions import (
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_TIMEOUT = 5
+DEFAULT_TIMEOUT = 15
 JOB_STATES = {
     "todo": ["pending", "created"],
     "doing": ["initializing", "running", "aborting"],
@@ -227,10 +227,10 @@ class Client:
         # make sure correct command is provided
         if command not in COMMANDS:  # pragma: no cover
             raise ValueError(f"invalid command given: {command}")
-
+        
         logger.debug("send job to API")
         res = self.post(
-            f"processes/{command}/execution", data=json.dumps(job), timeout=self.timeout
+            f"processes/{command}/execution", data=json.dumps(job, default=str), timeout=self.timeout
         )
 
         if res.status_code != 201:
