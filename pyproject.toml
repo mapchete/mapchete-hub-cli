@@ -31,7 +31,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
-    "mapchete_hub>=2021.11.0",
+    "mapchete_hub>=2023.12.0",
     "pytest",
     "pytest-cov",
     "pytest-env",

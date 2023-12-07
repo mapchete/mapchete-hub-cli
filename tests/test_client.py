@@ -20,41 +20,41 @@ def test_remote_version(mhub_client):
 
 
 def test_start_job(mhub_client, example_config_json):
-    """Start a job and return job state."""
+    """Start a job and return job status."""
     job = mhub_client.start_job(**example_config_json)
     assert job.status_code == 201
     job.wait(wait_for_max=120)
-    assert mhub_client.job(job.job_id).state == "done"
+    assert mhub_client.job(job.job_id).status == "done"
 
     assert isinstance(job.to_json(), str)
 
 
 def test_start_job_custom_process(mhub_client, example_config_custom_process_json):
-    """Start a job and return job state."""
+    """Start a job and return job status."""
     job = mhub_client.start_job(**example_config_custom_process_json)
     assert job.status_code == 201
     job.wait(wait_for_max=120)
-    assert mhub_client.job(job.job_id).state == "done"
+    assert mhub_client.job(job.job_id).status == "done"
 
 
 def test_start_job_python_process(mhub_client, example_config_python_process_json):
-    """Start a job and return job state."""
+    """Start a job and return job status."""
     job = mhub_client.start_job(
         **example_config_python_process_json,
         basedir=os.path.dirname(os.path.realpath(__file__))
     )
     assert job.status_code == 201
     job.wait(wait_for_max=120)
-    assert mhub_client.job(job.job_id).state == "done"
+    assert mhub_client.job(job.job_id).status == "done"
 
 
 def test_start_job_failing_process(mhub_client, example_config_process_exception_json):
-    """Start a job and return job state."""
+    """Start a job and return job status."""
     job = mhub_client.start_job(**example_config_process_exception_json)
     assert job.status_code == 201
     with pytest.raises(exceptions.JobFailed):
         job.wait(wait_for_max=120)
-    assert mhub_client.job(job.job_id).state == "failed"
+    assert mhub_client.job(job.job_id).status == "failed"
 
 
 @pytest.mark.skip(
@@ -65,19 +65,19 @@ def test_cancel_job(mhub_client, example_config_json):
     job = mhub_client.start_job(**example_config_json)
     job = mhub_client.cancel_job(job.job_id)
     assert job.status_code == 200
-    # running the TestClient sequentially actually results in a job state of "done" for now
-    assert mhub_client.job(job.job_id).state == "failed"
+    # running the TestClient sequentially actually results in a job status of "done" for now
+    assert mhub_client.job(job.job_id).status == "failed"
 
 
 def test_retry_job(mhub_client, example_config_json):
-    """Retry a job and return job state."""
+    """Retry a job and return job status."""
     job = mhub_client.start_job(**example_config_json)
     retried_job = mhub_client.retry_job(job.job_id)
     assert retried_job.status_code == 201
 
 
 def test_retry_last_job(mhub_client, example_config_json):
-    """Retry a job and return job state."""
+    """Retry a job and return job status."""
     mhub_client.start_job(**example_config_json)
     retried_job = mhub_client.retry_job(":last:")
     assert retried_job.status_code == 201
@@ -88,31 +88,31 @@ def test_job(mhub_client, example_config_json):
     job = mhub_client.start_job(**example_config_json)
     job = mhub_client.job(job.job_id)
     assert job.status_code == 200
-    assert job.state == "done"
+    assert job.status == "done"
     assert job.to_dict()
     assert isinstance(job.to_dict(), dict)
 
 
-def test_job_state(mhub_client, example_config_json):
-    """Return job state."""
+def test_job_status(mhub_client, example_config_json):
+    """Return job status."""
     job = mhub_client.start_job(**example_config_json)
-    assert mhub_client.job_state(job.job_id) == "done"
+    assert mhub_client.job_status(job.job_id) == "done"
 
 
-def test_last_job_state(mhub_client, example_config_json):
-    """Return job state."""
+def test_last_job_status(mhub_client, example_config_json):
+    """Return job status."""
     mhub_client.start_job(**example_config_json)
-    assert mhub_client.job_state(":last:") == "done"
+    assert mhub_client.job_status(":last:") == "done"
 
 
-def test_job_states(mhub_client, example_config_json):
-    """Return job state."""
+def test_job_statuss(mhub_client, example_config_json):
+    """Return job status."""
     mhub_client.start_job(**example_config_json)
-    states = mhub_client.jobs_states()
-    assert isinstance(states, dict)
-    for job_id, state in states.items():
+    statuss = mhub_client.jobs_statuss()
+    assert isinstance(statuss, dict)
+    for job_id, status in statuss.items():
         assert job_id
-        assert state
+        assert status
 
 
 def test_list_jobs_bounds(mhub_client, example_config_json):
@@ -139,15 +139,15 @@ def test_list_jobs_output_path(mhub_client, example_config_json):
     assert job_id not in jobs
 
 
-def test_list_jobs_state(mhub_client, example_config_json):
+def test_list_jobs_status(mhub_client, example_config_json):
     job_id = mhub_client.start_job(
         **dict(example_config_json, params=dict(example_config_json["params"], zoom=2))
     ).job_id
 
-    jobs = mhub_client.jobs(state="done")
+    jobs = mhub_client.jobs(status="done")
     assert job_id in jobs
 
-    jobs = mhub_client.jobs(state="cancelled")
+    jobs = mhub_client.jobs(status="cancelled")
     assert job_id not in jobs
 
 

@@ -55,7 +55,7 @@ def test_execute(mhub_integration_client, cli, example_config_mapchete):
 
     job = mhub_integration_client.job(job_id)
     job.wait(wait_for_max=120)
-    assert mhub_integration_client.job(job_id).state == "done"
+    assert mhub_integration_client.job(job_id).status == "done"
 
 
 @pytest.mark.skipif(
@@ -89,7 +89,7 @@ def test_execute_progress(mhub_integration_client, cli, example_config_mapchete)
     jobs = mhub_integration_client.jobs(job_name=job_name)
     assert len(jobs) == 1
     for k, v in jobs.items():
-        assert v.state == "done"
+        assert v.status == "done"
 
 
 @pytest.mark.skipif(
@@ -145,7 +145,7 @@ def test_cancel_by_job_id(mhub_integration_client, cli, example_config_mapchete)
     # wait and make sure it is cancelled
     job = mhub_integration_client.job(job_id)
     job.wait(wait_for_max=120, raise_exc=False)
-    assert mhub_integration_client.job(job_id).state in ["aborting", "cancelled"]
+    assert mhub_integration_client.job(job_id).status in ["aborting", "cancelled"]
 
 
 @pytest.mark.skipif(
@@ -165,7 +165,7 @@ def test_cancel_by_search(mhub_integration_client, cli, example_config_mapchete)
     # wait and make sure it is cancelled
     job = mhub_integration_client.job(job_id)
     job.wait(wait_for_max=120, raise_exc=False)
-    assert mhub_integration_client.job(job_id).state in ["aborting", "cancelled"]
+    assert mhub_integration_client.job(job_id).status in ["aborting", "cancelled"]
 
 
 @pytest.mark.skipif(
@@ -252,7 +252,7 @@ def test_jobs(mhub_integration_client, cli, example_config_mapchete):
     reason="requires up and running endpoint using docker-compose",
 )
 def test_jobs_sort_by(cli):
-    result = cli.run("jobs --sort-by state")
+    result = cli.run("jobs --sort-by status")
     assert result.exit_code == 0
 
     result = cli.run("jobs --sort-by progress")
@@ -330,7 +330,7 @@ def test_retry_by_job_id(mhub_integration_client, cli, example_config_mapchete):
     # wait and make sure it is finished
     job = mhub_integration_client.job(job_id)
     job.wait(wait_for_max=120, raise_exc=False)
-    assert mhub_integration_client.job(job_id).state == "done"
+    assert mhub_integration_client.job(job_id).status == "done"
 
     # retry job
     result = cli.run(f"retry -j {job_id} -f")
@@ -350,7 +350,7 @@ def test_retry_by_search(mhub_integration_client, cli, example_config_mapchete):
     # wait and make sure it is finished
     job = mhub_integration_client.job(job_id)
     job.wait(wait_for_max=120, raise_exc=False)
-    assert mhub_integration_client.job(job_id).state == "done"
+    assert mhub_integration_client.job(job_id).status == "done"
 
     # retry job
     result = cli.run("retry --since 5s -f")

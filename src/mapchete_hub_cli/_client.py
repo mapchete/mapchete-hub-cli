@@ -455,7 +455,9 @@ class Client:
         """
         if self._test_client:  # pragma: no cover
             kwargs.pop("timeout", None)
-        return dict(kwargs, auth=(self._user, self._password))
+        if self._user is not None and self._password is not None:
+            kwargs.update(auth=(self._user, self._password))
+        return kwargs
 
     def __repr__(self):  # pragma: no cover
         return f"Client(host={self.host}, user={self._user}, password={self._password})"

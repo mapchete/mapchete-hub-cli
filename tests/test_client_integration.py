@@ -27,11 +27,11 @@ ENDPOINT_AVAILABLE = _endpoint_available()
     reason="requires up and running endpoint using docker-compose",
 )
 def test_start_job(mhub_integration_client, example_config_json):
-    """Start a job and return job state."""
+    """Start a job and return job status."""
     job = mhub_integration_client.start_job(**example_config_json)
     assert job.status_code == 201
-    # running the TestClient sequentially actually results in a job state of "pending" for now
-    assert job.state == "pending"
+    # running the TestClient sequentially actually results in a job status of "parsing" for now
+    assert job.status == "parsing"
 
 
 @pytest.mark.skipif(
@@ -46,7 +46,7 @@ def test_cancel_job(mhub_integration_client, example_config_json):
     with pytest.raises((JobAborting, JobCancelled)):
         job.wait(wait_for_max=120)
     job = mhub_integration_client.job(job.job_id)
-    assert job.state in ["cancelled", "aborting"]
+    assert job.status in ["cancelled", "aborting"]
 
 
 @pytest.mark.skipif(
@@ -54,7 +54,7 @@ def test_cancel_job(mhub_integration_client, example_config_json):
     reason="requires up and running endpoint using docker-compose",
 )
 def test_retry_job(mhub_integration_client, example_config_json):
-    """Retry a job and return job state."""
+    """Retry a job and return job status."""
     job = mhub_integration_client.start_job(**example_config_json)
     retried_job = mhub_integration_client.retry_job(job.job_id)
     assert retried_job.status_code == 201
@@ -69,7 +69,7 @@ def test_job(mhub_integration_client, example_config_json):
     job = mhub_integration_client.start_job(**example_config_json)
     job = mhub_integration_client.job(job.job_id)
     assert job.status_code == 200
-    assert job.state == "running"
+    assert job.status in ["parsing", "initializing", "running"]
     assert job.to_dict()
     assert isinstance(job.to_dict(), dict)
 
@@ -78,10 +78,14 @@ def test_job(mhub_integration_client, example_config_json):
     not ENDPOINT_AVAILABLE,
     reason="requires up and running endpoint using docker-compose",
 )
-def test_job_state(mhub_integration_client, example_config_json):
-    """Return job state."""
+def test_job_status(mhub_integration_client, example_config_json):
+    """Return job status."""
     job = mhub_integration_client.start_job(**example_config_json)
-    assert mhub_integration_client.job_state(job.job_id) in ["running", "pending"]
+    assert mhub_integration_client.job_status(job.job_id) in [
+        "running",
+        "parsing",
+        "initializing",
+    ]
 
 
 @pytest.mark.skipif(
@@ -122,7 +126,7 @@ def test_list_jobs_output_path(mhub_integration_client, example_config_json):
     not ENDPOINT_AVAILABLE,
     reason="requires up and running endpoint using docker-compose",
 )
-def test_list_jobs_state(mhub_integration_client, example_config_json):
+def test_list_jobs_status(mhub_integration_client, example_config_json):
     job = mhub_integration_client.start_job(
         **dict(example_config_json, params=dict(example_config_json["params"], zoom=1))
     )
@@ -130,10 +134,10 @@ def test_list_jobs_state(mhub_integration_client, example_config_json):
 
     job.wait()
 
-    jobs = mhub_integration_client.jobs(state="done")
+    jobs = mhub_integration_client.jobs(status="done")
     assert job_id in jobs
 
-    jobs = mhub_integration_client.jobs(state="cancelled")
+    jobs = mhub_integration_client.jobs(status="cancelled")
     assert job_id not in jobs
 
 

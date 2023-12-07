@@ -1,5 +1,5 @@
-class UnknownJobState(Exception):
-    """Raise if job is registered but has unknown state."""
+class UnknownJobStatus(Exception):
+    """Raise if job is registered but has unknown status."""
 
 
 class JobNotStarted(Exception):
