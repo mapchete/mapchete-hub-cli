@@ -29,10 +29,10 @@ from mapchete_hub_cli.exceptions import (
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_TIMEOUT = 15
-JOB_STATES = {
-    "todo": ["pending", "created"],
-    "doing": ["initializing", "running", "aborting"],
+DEFAULT_TIMEOUT = 5
+JOB_STATUSES = {
+    "todo": ["parsing"],
+    "doing": ["initializing", "running"],
     "done": ["done", "failed", "cancelled"],
 }
 COMMANDS = ["execute"]
