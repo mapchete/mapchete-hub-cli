@@ -1,12 +1,19 @@
 import json
-import click
+import logging
 from datetime import datetime, timedelta
 from itertools import chain
-import logging
-from tqdm import tqdm
-import oyaml as yaml
 
-from mapchete_hub_cli import Client, COMMANDS, DEFAULT_TIMEOUT, JOB_STATES, __version__
+import click
+import oyaml as yaml
+from tqdm import tqdm
+
+from mapchete_hub_cli import (
+    COMMANDS,
+    DEFAULT_TIMEOUT,
+    JOB_STATUSES,
+    Client,
+    __version__,
+)
 from mapchete_hub_cli.exceptions import JobFailed
 from mapchete_hub_cli.log import set_log_level
 
@@ -194,16 +201,16 @@ opt_geojson = click.option("--geojson", "-g", is_flag=True, help="Print as GeoJS
 opt_output_path = click.option(
     "--output-path", "-p", type=click.STRING, help="Filter jobs by output_path."
 )
-opt_state = click.option(
-    "--state",
+opt_status = click.option(
+    "--status",
     "-s",
     type=click.Choice(
         (
-            [s.lower() for s in JOB_STATES.keys()]
-            + [s.lower() for s in chain(*[g for g in JOB_STATES.values()])]
+            [s.lower() for s in JOB_STATUSES.keys()]
+            + [s.lower() for s in chain(*[g for g in JOB_STATUSES.values()])]
         )
     ),
-    help="Filter jobs by job state.",
+    help="Filter jobs by job status.",
 )
 opt_command = click.option(
     "--command", "-c", type=click.Choice(COMMANDS), help="Filter jobs by command."
@@ -232,11 +239,6 @@ opt_dask_no_task_graph = click.option(
     "--dask-no-task-graph",
     is_flag=True,
     help="Don't compute task graph when using dask.",
-)
-opt_dask_no_results = click.option(
-    "--dask-no-results",
-    is_flag=True,
-    help="Don't pass on task results when using dask.",
 )
 opt_since = click.option(
     "--since",
@@ -273,9 +275,9 @@ opt_verbose = click.option(
 )
 opt_sort_by = click.option(
     "--sort-by",
-    type=click.Choice(["started", "runtime", "state", "progress"]),
-    default="state",
-    help="Sort jobs. (default: state)",
+    type=click.Choice(["started", "runtime", "status", "progress"]),
+    default="status",
+    help="Sort jobs. (default: status)",
 )
 opt_mhub_user = click.option(
     "--user",
@@ -330,7 +332,7 @@ def mhub(ctx, host, **kwargs):
 @mhub.command(short_help="Cancel jobs.")
 @opt_job_ids
 @opt_output_path
-@opt_state
+@opt_status
 @opt_command
 @opt_since_no_default
 @opt_until
@@ -341,7 +343,6 @@ def mhub(ctx, host, **kwargs):
 def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
     """Cancel jobs and their follow-up jobs if batch was submitted."""
     try:
-
         kwargs.update(from_date=kwargs.pop("since"), to_date=kwargs.pop("until"))
 
         if job_ids:
@@ -357,8 +358,8 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
 
         def _yield_revokable_jobs(jobs):
             for j in jobs:
-                if j.state in JOB_STATES["done"]:  # pragma: no cover
-                    click.echo(f"Job {j.job_id} already in state {j.state}.")
+                if j.status in JOB_STATUSES["done"]:  # pragma: no cover
+                    click.echo(f"Job {j.job_id} already in status {j.status}.")
                 else:
                     yield j.job_id
 
@@ -376,7 +377,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
             for job_id in job_ids:
                 job = Client(**ctx.obj).cancel_job(job_id)
                 logger.debug(job.to_dict())
-                click.echo(f"job {job.state}")
+                click.echo(f"job {job.status}")
 
     except Exception as e:  # pragma: no cover
         if debug:
@@ -398,7 +399,6 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
 @opt_dask_max_submitted_tasks
 @opt_dask_chunksize
 @opt_dask_no_task_graph
-@opt_dask_no_results
 @opt_debug
 @opt_job_name
 @click.pass_context
@@ -409,10 +409,16 @@ def execute(
     verbose=False,
     debug=False,
     dask_no_task_graph=False,
-    dask_no_results=False,
+    dask_max_submitted_tasks=1000,
+    dask_chunksize=100,
     **kwargs,
 ):
     """Execute a process."""
+    dask_settings = dict(
+        process_graph=not dask_no_task_graph,
+        max_submitted_tasks=dask_max_submitted_tasks,
+        chunksize=dask_chunksize,
+    )
     for mapchete_file in mapchete_files:
         try:
             job = Client(**ctx.obj).start_job(
@@ -421,12 +427,11 @@ def execute(
                 params=dict(
                     kwargs,
                     mode="overwrite" if overwrite else "continue",
-                    dask_compute_graph=not dask_no_task_graph,
-                    dask_propagate_results=not dask_no_results,
+                    dask_settings=dask_settings,
                 ),
             )
             if verbose:  # pragma: no cover
-                click.echo(f"job {job.job_id} {job.state}")
+                click.echo(f"job {job.job_id} {job.status}")
                 job = Client(**ctx.obj).job(job.job_id)
                 if job.properties.get("dask_dashboard_link"):
                     click.echo(
@@ -498,7 +503,7 @@ def job(
             click.echo(job.to_dict()["properties"].get("exception"))
             click.echo(job.to_dict()["properties"].get("traceback"))
         if progress:  # pragma: no cover
-            click.echo(f"job {job.job_id} {job.state}")
+            click.echo(f"job {job.job_id} {job.status}")
             _show_progress(ctx, job_id, disable=debug)
         else:
             _print_job_details(job, metadata_items=metadata_items, verbose=True)
@@ -535,7 +540,7 @@ def progress(
     """
     try:
         job = Client(**ctx.obj).job(job_id)
-        click.echo(f"job {job.job_id} {job.state}")
+        click.echo(f"job {job.job_id} {job.status}")
         _show_progress(ctx, job_id, disable=debug, interval=interval)
     except Exception as e:  # pragma: no cover
         if debug:
@@ -545,7 +550,7 @@ def progress(
 
 @mhub.command(short_help="Show current jobs.")
 @opt_output_path
-@opt_state
+@opt_status
 @opt_command
 @opt_since
 @opt_until
@@ -569,12 +574,12 @@ def jobs(
     """Show current jobs."""
 
     def _sort_jobs(jobs, sort_by=None):
-        if sort_by == "state":
+        if sort_by == "status":
             return list(
                 sorted(
                     jobs,
                     key=lambda x: (
-                        x.to_dict()["properties"]["state"],
+                        x.to_dict()["properties"]["status"],
                         x.to_dict()["properties"]["updated"],
                     ),
                 )
@@ -598,7 +603,7 @@ def jobs(
         if geojson:
             click.echo(Client(**ctx.obj).jobs(geojson=True, **kwargs))
         else:
-            # sort by state and then by timestamp
+            # sort by status and then by timestamp
             jobs = _sort_jobs(
                 Client(**ctx.obj).jobs(**kwargs).values(), sort_by=sort_by
             )
@@ -668,7 +673,7 @@ def dask_specs(ctx, **kwargs):
     "--use-old-image", is_flag=True, help="Force to rerun Job on image from first run."
 )
 @opt_output_path
-@opt_state
+@opt_status
 @opt_command
 @opt_bounds
 @opt_since_no_default
@@ -707,8 +712,11 @@ def retry(
 
         def _yield_retryable_jobs(jobs):
             for j in jobs:
-                if j.state not in [*JOB_STATES["done"], "aborting"]:  # pragma: no cover
-                    click.echo(f"Job {j.job_id} still in state {j.state}.")
+                if j.status not in [
+                    *JOB_STATUSES["done"],
+                    "aborting",
+                ]:  # pragma: no cover
+                    click.echo(f"Job {j.job_id} still in status {j.status}.")
                 else:
                     yield j.job_id
 
@@ -725,7 +733,7 @@ def retry(
         ):
             for job_id in job_ids:
                 job = Client(**ctx.obj).retry_job(job_id, use_old_image=use_old_image)
-                click.echo(f"job {job.job_id} {job.state}")
+                click.echo(f"job {job.job_id} {job.status}")
     except Exception as e:  # pragma: no cover
         if debug:
             raise
@@ -745,32 +753,31 @@ def _print_job_details(job, metadata_items=None, verbose=False):
         else:
             return f"{round(seconds, 3)}s"
 
-    for group, states in JOB_STATES.items():  # pragma: no cover
-        for state in states:
-            if job.state == state:
+    color = "white"
+    for group, statuss in JOB_STATUSES.items():  # pragma: no cover
+        for status in statuss:
+            if job.status == status:
                 if group == "todo":
                     color = "blue"
                 elif group == "doing":
                     color = "yellow"
-                elif state == "done":
+                elif status == "done":
                     color = "green"
-                elif state == "failed":
+                elif status == "failed":
                     color = "red"
-                elif state in ["aborting", "cancelled"]:
+                elif status in ["aborting", "cancelled"]:
                     color = "magenta"
-                else:
-                    color = "white"
     mapchete_config = job.properties.get("mapchete", {}).get("config", {})
 
-    # job ID and job state
+    # job ID and job status
     click.echo(click.style(f"{job.job_id}", fg=color, bold=True))
 
     if verbose:
         # job name
         click.echo(f"job name: {job.properties.get('job_name')}")
 
-        # state
-        click.echo(click.style(f"state: {job.state}"))
+        # status
+        click.echo(click.style(f"status: {job.status}"))
 
         # exception
         click.echo(click.style(f"exception: {job.properties.get('exception')}"))
@@ -836,7 +843,7 @@ def _show_progress(ctx, job_id, disable=False, interval=0.3):
                 current_progress = i["current_progress"]
                 pbar.update(current_progress - last_progress)
                 last_progress = current_progress
-        click.echo(f"job {i['state']}")
+        click.echo(f"job {i['status']}")
     except JobFailed as e:  # pragma: no cover
         click.echo(f"Job {job_id} failed: {e}")
         return
