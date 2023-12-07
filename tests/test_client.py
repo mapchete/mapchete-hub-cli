@@ -1,10 +1,10 @@
 import datetime
 import json
 import os
-import pytest
-from shapely.geometry import shape
 import time
 
+import pytest
+from shapely.geometry import shape
 
 from mapchete_hub_cli import exceptions
 

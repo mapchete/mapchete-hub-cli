@@ -1,12 +1,13 @@
-from click.testing import CliRunner
+import os
 from collections import namedtuple
+
+import pytest
+import yaml
+from click.testing import CliRunner
 from dask.distributed import LocalCluster
 from fastapi.testclient import TestClient
-import os
-import pytest
 from mapchete_hub.app import app, get_backend_db, get_dask_cluster_setup
 from mapchete_hub.db import BackendDB
-import yaml
 
 from mapchete_hub_cli import Client
 from mapchete_hub_cli.cli import mhub
