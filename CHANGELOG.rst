@@ -3,6 +3,18 @@ Changelog
 #########
 
 
+----------------------
+2023.12.0 - 2023-12-11
+----------------------
+
+    * core
+
+        * adapt CLI to breaking changes made in `mapchete_hub` `2023.12.0`
+
+    * CI
+
+        * deactivate integration tests, because they are currently not working!
+
 
 ---------------------
 2023.6.0 - 2023-06-13
