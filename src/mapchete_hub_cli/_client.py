@@ -5,18 +5,18 @@ This module wraps around the requests module for real-life usage and FastAPI's T
 in order to be able to test mhub CLI.
 """
 
-from collections import OrderedDict
 import datetime
 import json
-from json.decoder import JSONDecodeError
 import logging
 import os
 import py_compile
 import time
+from collections import OrderedDict
+from json.decoder import JSONDecodeError
 
+import oyaml as yaml
 import requests
 from requests.exceptions import HTTPError
-import oyaml as yaml
 
 from mapchete_hub_cli.exceptions import (
     JobAborting,
@@ -26,14 +26,13 @@ from mapchete_hub_cli.exceptions import (
     JobRejected,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_TIMEOUT = 15
-JOB_STATES = {
-    "todo": ["pending", "created"],
-    "doing": ["initializing", "running", "aborting"],
+DEFAULT_TIMEOUT = 5
+JOB_STATUSES = {
+    "todo": ["parsing"],
+    "doing": ["initializing", "running"],
     "done": ["done", "failed", "cancelled"],
 }
 COMMANDS = ["execute"]
@@ -43,11 +42,11 @@ class Job:
     """Job metadata class."""
 
     def __init__(
-        self, status_code=None, state=None, job_id=None, json=None, _client=None
+        self, status_code=None, status=None, job_id=None, json=None, _client=None
     ):
         """Initialize."""
         self.status_code = status_code
-        self.state = state
+        self.status = status
         self.job_id = job_id
         self.exists = True if status_code == 409 else False
         self._dict = OrderedDict(json.items())
@@ -64,7 +63,7 @@ class Job:
 
     def __repr__(self):  # pragma: no cover
         """Print Job."""
-        return f"Job(status_code={self.status_code}, state={self.state}, job_id={self.job_id}, updated={self.properties.get('updated')}"
+        return f"Job(status_code={self.status_code}, status={self.status}, job_id={self.job_id}, updated={self.properties.get('updated')}"
 
     def wait(self, wait_for_max=None, raise_exc=True):
         """Block until job has finished processing."""
@@ -184,7 +183,7 @@ class Client:
 
     def start_job(self, command="execute", config=None, params=None, basedir=None):
         """
-        Start a job and return job state.
+        Start a job and return job status.
 
         Sends HTTP POST to /jobs/<job_id> and appends mapchete configuration as well
         as processing parameters as JSON.
@@ -243,7 +242,7 @@ class Client:
             logger.debug(f"job {job_id} sent")
             return Job(
                 status_code=res.status_code,
-                state=res.json()["properties"]["state"],
+                status=res.json()["properties"]["status"],
                 job_id=job_id,
                 json=res.json(),
                 _client=self,
@@ -266,7 +265,7 @@ class Client:
             raise JobNotFound(f"job {job_id} does not exist")
         return Job(
             status_code=res.status_code,
-            state=self.job_state(job_id),
+            status=self.job_status(job_id),
             job_id=job_id,
             json=res.json(),
             _client=self,
@@ -274,7 +273,7 @@ class Client:
 
     def retry_job(self, job_id, use_old_image=False):
         """
-        Retry a job and its children and return job state.
+        Retry a job and its children and return job status.
 
         Sends HTTP POST to /jobs/<job_id> and appends mapchete configuration as well
         as processing parameters as JSON.
@@ -327,16 +326,16 @@ class Client:
                 if geojson
                 else Job(
                     status_code=res.status_code,
-                    state=res.json()["properties"]["state"],
+                    status=res.json()["properties"]["status"],
                     job_id=job_id,
                     json=res.json(),
                     _client=self,
                 )
             )
 
-    def job_state(self, job_id):
+    def job_status(self, job_id):
         """
-        Return job state.
+        Return job status.
 
         Parameters
         ----------
@@ -346,7 +345,7 @@ class Client:
         """
         if job_id == ":last:":
             job_id = self.get_last_job_id()
-        return self.job(job_id).state
+        return self.job(job_id).status
 
     def jobs(self, geojson=False, indent=4, bounds=None, **kwargs):
         """Return jobs metadata."""
@@ -366,7 +365,7 @@ class Client:
             else {
                 job["id"]: Job(
                     status_code=200,
-                    state=job["properties"]["state"],
+                    status=job["properties"]["status"],
                     job_id=job["id"],
                     json=job,
                     _client=self,
@@ -375,10 +374,10 @@ class Client:
             }
         )
 
-    def jobs_states(self, output_path=None):
-        """Return jobs states."""
+    def jobs_statuss(self, output_path=None):
+        """Return jobs statuss."""
         return {
-            job_id: job.state
+            job_id: job.status
             for job_id, job in self.jobs(
                 timeout=self.timeout, output_path=output_path
             ).items()
@@ -404,43 +403,43 @@ class Client:
                 wait_for_max is not None and time.time() - start > wait_for_max
             ):  # pragma: no cover
                 raise RuntimeError(
-                    f"job not done in time, last state was '{job.state}'"
+                    f"job not done in time, last status was '{job.status}'"
                 )
             properties = job.to_dict()["properties"]
-            if job.state == "pending":  # pragma: no cover
+            if job.status == "pending":  # pragma: no cover
                 continue
-            elif job.state == "running" and properties.get("total_progress"):
+            elif job.status == "running" and properties.get("total_progress"):
                 current_progress = properties["current_progress"]
                 if current_progress > last_progress:
                     yield dict(
-                        state=job.state,
+                        status=job.status,
                         current_progress=current_progress,
                         total_progress=properties["total_progress"],
                     )
                     last_progress = current_progress
-            elif job.state == "aborting":
+            elif job.status == "aborting":
                 if raise_exc:
                     raise JobAborting(f"job {job_id} aborting")
                 else:
                     return
-            elif job.state == "cancelled":  # pragma: no cover
+            elif job.status == "cancelled":  # pragma: no cover
                 if raise_exc:
                     raise JobCancelled(f"job {job_id} cancelled")
                 else:
                     return
-            elif job.state == "failed":
+            elif job.status == "failed":
                 if raise_exc:
                     raise JobFailed(f"job failed with {properties['exception']}")
                 else:  # pragma: no cover
                     return
-            elif job.state == "done":
+            elif job.status == "done":
                 current_progress = properties.get("current_progress")
                 total_progress = properties.get("total_progress")
                 if (current_progress is not None and total_progress is not None) and (
                     current_progress == total_progress
                 ):
                     yield dict(
-                        state=job.state,
+                        status=job.status,
                         current_progress=current_progress,
                         total_progress=total_progress,
                     )
@@ -456,7 +455,9 @@ class Client:
         """
         if self._test_client:  # pragma: no cover
             kwargs.pop("timeout", None)
-        return dict(kwargs, auth=(self._user, self._password))
+        if self._user is not None and self._password is not None:
+            kwargs.update(auth=(self._user, self._password))
+        return kwargs
 
     def __repr__(self):  # pragma: no cover
         return f"Client(host={self.host}, user={self._user}, password={self._password})"
@@ -467,7 +468,7 @@ def load_mapchete_config(mapchete_config, basedir=None):
     Return preprocessed mapchete config provided as dict or file.
 
     This function reads a mapchete config into an OrderedDict which keeps the item order
-    stated in the .mapchete file.
+    statusd in the .mapchete file.
     If the configuration is passed on via a .mapchete file and if a process file path
     instead of a process module path was given, it will also check the syntax and replace
     the process item with the python code as string.
@@ -515,11 +516,11 @@ def load_mapchete_config(mapchete_config, basedir=None):
 
 def cleanup_datetime(d):
     """Convert datetime objects in dictionary to strings."""
-    return OrderedDict(
-        (k, cleanup_datetime(v))
-        if isinstance(v, dict)
-        else (k, str(v))
-        if isinstance(v, datetime.date)
-        else (k, v)
-        for k, v in d.items()
-    )
+    if isinstance(d, dict):
+        return OrderedDict([(k, cleanup_datetime(v)) for k, v in d.items()])
+    elif isinstance(d, (list, tuple)):
+        return [cleanup_datetime(ii) for ii in d]
+    elif isinstance(d, datetime.date):
+        return str(d)
+    else:
+        return d
