@@ -292,6 +292,13 @@ opt_make_zones = click.option(
     default=None,
     help="Split up job into smaller jobs using a specified zoom level grid.",
 )
+opt_zone = click.option(
+    "--zone",
+    type=click.INT,
+    nargs=3,
+    default=None,
+    help="Run on Zone defined by process pyramid grid.",
+)
 
 
 @click.version_option(version=__version__, message="%(version)s")
@@ -400,6 +407,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
 @opt_debug
 @opt_job_name
 @opt_make_zones
+@opt_zone
 @click.pass_context
 def execute(
     ctx,
@@ -413,6 +421,7 @@ def execute(
     dask_chunksize=100,
     make_zones_on_zoom=None,
     job_name=None,
+    zone=None,
     **kwargs,
 ):
     """Execute a process."""
@@ -423,9 +432,9 @@ def execute(
     )
     for mapchete_file in mapchete_files:
         try:
-            if make_zones_on_zoom:
-                if bounds is None:
-                    raise click.UsageError("--make-zones-on-zoom requires --bounds")
+            if make_zones_on_zoom is not None and bounds is None:
+                raise click.UsageError("--make-zones-on-zoom requires --bounds")
+            elif make_zones_on_zoom is not None or zone is not None:
                 try:
                     from tilematrix import TilePyramid
                 except ImportError:  # pragma: no cover
@@ -434,7 +443,12 @@ def execute(
                     )
                 config = load_mapchete_config(mapchete_file)
                 tp = TilePyramid(config["pyramid"]["grid"])
-                for tile in tp.tiles_from_bounds(bounds, make_zones_on_zoom):
+                tiles = (
+                    tp.tiles_from_bounds(bounds, make_zones_on_zoom)
+                    if make_zones_on_zoom
+                    else [tp.tile(*zone)]
+                )
+                for tile in tiles:
                     zone_job_name = (
                         f"{job_name}-{tile.zoom}-{tile.row}-{tile.col}"
                         if job_name
@@ -445,7 +459,9 @@ def execute(
                         config=mapchete_file,
                         params=dict(
                             kwargs,
-                            bounds=bounds_intersection(bounds, tile.bounds()),
+                            bounds=bounds_intersection(bounds, tile.bounds())
+                            if bounds
+                            else tile.bounds(),
                             mode="overwrite" if overwrite else "continue",
                             dask_settings=dask_settings,
                             job_name=zone_job_name,
