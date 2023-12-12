@@ -13,4 +13,4 @@ __all__ = [
     "JOB_STATUSES",
     "load_mapchete_config",
 ]
-__version__ = "2023.12.0"
+__version__ = "2023.12.1"
