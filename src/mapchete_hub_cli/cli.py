@@ -13,6 +13,7 @@ from mapchete_hub_cli import (
     JOB_STATUSES,
     Client,
     __version__,
+    load_mapchete_config,
 )
 from mapchete_hub_cli.exceptions import JobFailed
 from mapchete_hub_cli.log import set_log_level
@@ -31,19 +32,10 @@ def _set_debug_log_level(ctx, param, debug):
 
 
 def _check_dask_specs(ctx, param, dask_specs):
-    # read from JSON config
-    if dask_specs.endswith(".json"):
+    if dask_specs:
+        # read from JSON config
         with open(dask_specs, "r") as src:
             return json.loads(src.read())
-
-    # use one of the presets
-    res = Client(**ctx.obj).get("dask_specs")
-    if res.status_code != 200:  # pragma: no cover
-        raise ConnectionError(res.json())
-    for w in res.json().keys():
-        if dask_specs not in res.json().keys():  # pragma: no cover
-            raise TypeError(f"dask specs must be one of {res.json().keys()}")
-    return dask_specs
 
 
 def _get_timestamp(ctx, param, timestamp):
@@ -220,7 +212,6 @@ opt_dask_specs = click.option(
     "-w",
     type=click.STRING,
     callback=_check_dask_specs,
-    default="default",
     help="Choose worker performance class.",
 )
 opt_dask_max_submitted_tasks = click.option(
@@ -293,6 +284,13 @@ opt_mhub_password = click.option(
 )
 opt_metadata_items = click.option(
     "--metadata-items", "-i", type=click.STRING, callback=_expand_str_list
+)
+opt_make_zones = click.option(
+    "--make-zones-on-zoom",
+    "-zz",
+    type=click.INT,
+    default=None,
+    help="Split up job into smaller jobs using a specified zoom level grid.",
 )
 
 
@@ -401,16 +399,20 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
 @opt_dask_no_task_graph
 @opt_debug
 @opt_job_name
+@opt_make_zones
 @click.pass_context
 def execute(
     ctx,
     mapchete_files,
+    bounds=None,
     overwrite=False,
     verbose=False,
     debug=False,
     dask_no_task_graph=False,
     dask_max_submitted_tasks=1000,
     dask_chunksize=100,
+    make_zones_on_zoom=None,
+    job_name=None,
     **kwargs,
 ):
     """Execute a process."""
@@ -421,25 +423,57 @@ def execute(
     )
     for mapchete_file in mapchete_files:
         try:
-            job = Client(**ctx.obj).start_job(
-                command="execute",
-                config=mapchete_file,
-                params=dict(
-                    kwargs,
-                    mode="overwrite" if overwrite else "continue",
-                    dask_settings=dask_settings,
-                ),
-            )
-            if verbose:  # pragma: no cover
-                click.echo(f"job {job.job_id} {job.status}")
-                job = Client(**ctx.obj).job(job.job_id)
-                if job.properties.get("dask_dashboard_link"):
-                    click.echo(
-                        f"dask dashboard: {job.properties.get('dask_dashboard_link')}"
+            if make_zones_on_zoom:
+                if bounds is None:
+                    raise click.UsageError("--make-zones-on-zoom requires --bounds")
+                try:
+                    from tilematrix import TilePyramid
+                except ImportError:  # pragma: no cover
+                    raise ImportError(
+                        "please install mapchete_hub_cli[zones] extra for this feature."
                     )
-                _show_progress(ctx, job.job_id, disable=debug)
+                config = load_mapchete_config(mapchete_file)
+                tp = TilePyramid(config["pyramid"]["grid"])
+                for tile in tp.tiles_from_bounds(bounds, make_zones_on_zoom):
+                    zone_job_name = (
+                        f"{job_name}-{tile.zoom}-{tile.row}-{tile.col}"
+                        if job_name
+                        else None
+                    )
+                    job = Client(**ctx.obj).start_job(
+                        command="execute",
+                        config=mapchete_file,
+                        params=dict(
+                            kwargs,
+                            bounds=bounds_intersection(bounds, tile.bounds()),
+                            mode="overwrite" if overwrite else "continue",
+                            dask_settings=dask_settings,
+                            job_name=zone_job_name,
+                        ),
+                    )
+                    click.echo(job.job_id)
             else:
-                click.echo(job.job_id)
+                job = Client(**ctx.obj).start_job(
+                    command="execute",
+                    config=mapchete_file,
+                    params=dict(
+                        kwargs,
+                        bounds=bounds,
+                        mode="overwrite" if overwrite else "continue",
+                        dask_settings=dask_settings,
+                        job_name=job_name,
+                    ),
+                )
+                if verbose:  # pragma: no cover
+                    click.echo(f"job {job.job_id} {job.status}")
+                    job = Client(**ctx.obj).job(job.job_id)
+                    if job.properties.get("dask_dashboard_link"):
+                        click.echo(
+                            f"dask dashboard: {job.properties.get('dask_dashboard_link')}"
+                        )
+                    _show_progress(ctx, job.job_id, disable=debug)
+                else:
+                    click.echo(job.job_id)
         except Exception as e:  # pragma: no cover
             if debug:
                 raise
@@ -657,16 +691,6 @@ def processes(ctx, process_name=None, docstrings=False, debug=None, **kwargs):
         raise click.ClickException(e)
 
 
-@mhub.command(short_help="Show available worker specs.")
-@opt_debug
-@click.pass_context
-def dask_specs(ctx, **kwargs):
-    res = Client(**ctx.obj).get("dask_specs")
-    if res.status_code != 200:  # pragma: no cover
-        raise ConnectionError(res.json())
-    click.echo(json.dumps(res.json(), indent=4, sort_keys=True))
-
-
 @mhub.command(short_help="Retry jobs.")
 @opt_job_ids
 @click.option(
@@ -847,3 +871,12 @@ def _show_progress(ctx, job_id, disable=False, interval=0.3):
     except JobFailed as e:  # pragma: no cover
         click.echo(f"Job {job_id} failed: {e}")
         return
+
+
+def bounds_intersection(bounds1, bounds2):
+    return (
+        max([bounds1[0], bounds2[0]]),
+        max([bounds1[1], bounds2[1]]),
+        min([bounds1[2], bounds2[2]]),
+        min([bounds1[3], bounds2[3]]),
+    )

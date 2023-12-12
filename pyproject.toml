@@ -30,6 +30,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+zones = [
+    "tilematrix"
+]
 test = [
     "mapchete_hub>=2023.12.0",
     "pytest",
