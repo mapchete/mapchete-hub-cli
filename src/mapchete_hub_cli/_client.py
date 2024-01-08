@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 MHUB_CLI_ZONES_WAIT_TILES_COUNT = int(os.environ.get('MHUB_CLI_ZONES_WAIT_TILES_COUNT', '5'))
 MHUB_CLI_ZONES_WAIT_TIME_SECONDS = int(os.environ.get('MHUB_CLI_ZONES_WAIT_TIME_SECONDS', '10'))
 
-DEFAULT_TIMEOUT = 5
+DEFAULT_TIMEOUT = int(os.environ.get('MHUB_CLI_DEFAULT_TIMEOUT', '5'))
 JOB_STATUSES = {
     "todo": ["parsing"],
     "doing": ["initializing", "running"],
