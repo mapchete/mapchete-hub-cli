@@ -2,6 +2,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from itertools import chain
+from time import sleep
 
 import click
 import oyaml as yaml
@@ -11,6 +12,8 @@ from mapchete_hub_cli import (
     COMMANDS,
     DEFAULT_TIMEOUT,
     JOB_STATUSES,
+    MHUB_CLI_ZONES_WAIT_TILES_COUNT,
+    MHUB_CLI_ZONES_WAIT_TIME_SECONDS,
     Client,
     __version__,
     load_mapchete_config,
@@ -454,6 +457,8 @@ def execute(
                         if job_name
                         else None
                     )
+                    if len(MHUB_CLI_ZONES_WAIT_TILES_COUNT) >= 5:
+                        sleep(MHUB_CLI_ZONES_WAIT_TIME_SECONDS) 
                     job = Client(**ctx.obj).start_job(
                         command="execute",
                         config=mapchete_file,
