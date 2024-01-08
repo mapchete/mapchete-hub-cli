@@ -457,7 +457,7 @@ def execute(
                         if job_name
                         else None
                     )
-                    if len(MHUB_CLI_ZONES_WAIT_TILES_COUNT) >= 5:
+                    if len(tiles) >= MHUB_CLI_ZONES_WAIT_TILES_COUNT:
                         sleep(MHUB_CLI_ZONES_WAIT_TIME_SECONDS) 
                     job = Client(**ctx.obj).start_job(
                         command="execute",
