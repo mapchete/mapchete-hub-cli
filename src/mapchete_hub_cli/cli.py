@@ -2,6 +2,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from itertools import chain
+from time import sleep
 
 import click
 import oyaml as yaml
@@ -11,6 +12,8 @@ from mapchete_hub_cli import (
     COMMANDS,
     DEFAULT_TIMEOUT,
     JOB_STATUSES,
+    MHUB_CLI_ZONES_WAIT_TILES_COUNT,
+    MHUB_CLI_ZONES_WAIT_TIME_SECONDS,
     Client,
     __version__,
     load_mapchete_config,
@@ -292,6 +295,20 @@ opt_make_zones = click.option(
     default=None,
     help="Split up job into smaller jobs using a specified zoom level grid.",
 )
+opt_zones_wait_count = click.option(
+    "--zones-wait-count",
+    "-zwc",
+    type=click.INT,
+    default=MHUB_CLI_ZONES_WAIT_TILES_COUNT,
+    help=f"Threshold for at how many submitted zones the mhub cli should wait, only triggers when --make-zones-on-zoom is used. (default: {MHUB_CLI_ZONES_WAIT_TILES_COUNT})",
+)
+opt_zones_wait_seconds = click.option(
+    "--zones-wait-seconds",
+    "-zws",
+    type=click.INT,
+    default=MHUB_CLI_ZONES_WAIT_TIME_SECONDS,
+    help=f"How long should the mhub cli wait until submitting next zone in seconds, only triggers when --make-zones-on-zoom is used. (default: {MHUB_CLI_ZONES_WAIT_TIME_SECONDS})",
+)
 opt_zone = click.option(
     "--zone",
     type=click.INT,
@@ -407,6 +424,8 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
 @opt_debug
 @opt_job_name
 @opt_make_zones
+@opt_zones_wait_count
+@opt_zones_wait_seconds
 @opt_zone
 @click.pass_context
 def execute(
@@ -420,6 +439,8 @@ def execute(
     dask_max_submitted_tasks=1000,
     dask_chunksize=100,
     make_zones_on_zoom=None,
+    zones_wait_count=5,
+    opt_zones_wait_seconds=10,
     job_name=None,
     zone=None,
     **kwargs,
@@ -454,6 +475,8 @@ def execute(
                         if job_name
                         else None
                     )
+                    if len(tiles) >= zones_wait_count:
+                        sleep(opt_zones_wait_seconds) 
                     job = Client(**ctx.obj).start_job(
                         command="execute",
                         config=mapchete_file,

@@ -8,7 +8,9 @@ stages:
 
 # build python packages
 build_python:
-  image: python:3.10-slim-buster
+  image: docker.io/python:3.10-slim-buster
+  tags:
+    - privileged
   stage: build
   artifacts:
     paths:
@@ -20,7 +22,9 @@ build_python:
 
 # test python packages
 test_wheel:
-  image: python:3.10-slim-buster
+  image: docker.io/python:3.10-slim-buster
+  tags:
+    - privileged  
   needs: ["build_python"]
   stage: test
   before_script:
@@ -36,7 +40,9 @@ test_wheel:
     - pytest -v --cov=mapchete_hub_cli tests/ && coverage report
 
 test_tar:
-  image: python:3.10-slim-buster
+  image: docker.io/python:3.10-slim-buster
+  tags:
+    - privileged  
   needs: ["build_python"]
   stage: test
   before_script:
@@ -97,7 +103,9 @@ test_tar:
 
 # release package
 package:
-  image: python:3.10-slim-buster
+  image: docker.io/python:3.10-slim-buster
+  tags:
+    - privileged  
   stage: package
   before_script:
     - pip install --upgrade pip hatch
