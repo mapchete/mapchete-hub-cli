@@ -440,7 +440,7 @@ def execute(
     dask_chunksize=100,
     make_zones_on_zoom=None,
     zones_wait_count=5,
-    opt_zones_wait_seconds=10,
+    zones_wait_seconds=10,
     job_name=None,
     zone=None,
     **kwargs,
@@ -464,7 +464,7 @@ def execute(
                     )
                 config = load_mapchete_config(mapchete_file)
                 tp = TilePyramid(config["pyramid"]["grid"])
-                tiles = (
+                tiles = list(
                     tp.tiles_from_bounds(bounds, make_zones_on_zoom)
                     if make_zones_on_zoom
                     else [tp.tile(*zone)]
@@ -476,7 +476,7 @@ def execute(
                         else None
                     )
                     if len(tiles) >= zones_wait_count:
-                        sleep(opt_zones_wait_seconds) 
+                        sleep(zones_wait_seconds) 
                     job = Client(**ctx.obj).start_job(
                         command="execute",
                         config=mapchete_file,
