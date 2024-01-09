@@ -300,14 +300,14 @@ opt_zones_wait_count = click.option(
     "-zwc",
     type=click.INT,
     default=MHUB_CLI_ZONES_WAIT_TILES_COUNT,
-    help="Threshold for at how many submitted zones the mhub cli should wait, only triggers when --make-zones-on-zoom is used.",
+    help=f"Threshold for at how many submitted zones the mhub cli should wait, only triggers when --make-zones-on-zoom is used. (default: {MHUB_CLI_ZONES_WAIT_TILES_COUNT})",
 )
 opt_zones_wait_seconds = click.option(
     "--zones-wait-seconds",
     "-zws",
     type=click.INT,
     default=MHUB_CLI_ZONES_WAIT_TIME_SECONDS,
-    help="How long should the mhub cli wait until submitting next zone in seconds, only triggers when --make-zones-on-zoom is used.",
+    help=f"How long should the mhub cli wait until submitting next zone in seconds, only triggers when --make-zones-on-zoom is used. (default: {MHUB_CLI_ZONES_WAIT_TIME_SECONDS})",
 )
 opt_zone = click.option(
     "--zone",
