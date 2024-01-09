@@ -464,7 +464,7 @@ def execute(
                     )
                 config = load_mapchete_config(mapchete_file)
                 tp = TilePyramid(config["pyramid"]["grid"])
-                tiles = (
+                tiles = list(
                     tp.tiles_from_bounds(bounds, make_zones_on_zoom)
                     if make_zones_on_zoom
                     else [tp.tile(*zone)]
