@@ -33,9 +33,9 @@ MHUB_CLI_ZONES_WAIT_TIME_SECONDS = int(os.environ.get('MHUB_CLI_ZONES_WAIT_TIME_
 
 DEFAULT_TIMEOUT = int(os.environ.get('MHUB_CLI_DEFAULT_TIMEOUT', '5'))
 JOB_STATUSES = {
-    "todo": ["parsing"],
-    "doing": ["initializing", "running"],
-    "done": ["done", "failed", "cancelled"],
+    "todo": ["pending"],
+    "doing": ["parsing", "initializing", "retrying", "running"],
+    "done": ["aborting", "done", "failed", "cancelled"],
 }
 COMMANDS = ["execute"]
 
