@@ -28,10 +28,14 @@ from mapchete_hub_cli.exceptions import (
 
 logger = logging.getLogger(__name__)
 
-MHUB_CLI_ZONES_WAIT_TILES_COUNT = int(os.environ.get('MHUB_CLI_ZONES_WAIT_TILES_COUNT', '5'))
-MHUB_CLI_ZONES_WAIT_TIME_SECONDS = int(os.environ.get('MHUB_CLI_ZONES_WAIT_TIME_SECONDS', '10'))
+MHUB_CLI_ZONES_WAIT_TILES_COUNT = int(
+    os.environ.get("MHUB_CLI_ZONES_WAIT_TILES_COUNT", "5")
+)
+MHUB_CLI_ZONES_WAIT_TIME_SECONDS = int(
+    os.environ.get("MHUB_CLI_ZONES_WAIT_TIME_SECONDS", "10")
+)
 
-DEFAULT_TIMEOUT = int(os.environ.get('MHUB_CLI_DEFAULT_TIMEOUT', '5'))
+DEFAULT_TIMEOUT = int(os.environ.get("MHUB_CLI_DEFAULT_TIMEOUT", "5"))
 JOB_STATUSES = {
     "todo": ["pending"],
     "doing": ["parsing", "initializing", "retrying", "running"],
@@ -228,10 +232,12 @@ class Client:
         # make sure correct command is provided
         if command not in COMMANDS:  # pragma: no cover
             raise ValueError(f"invalid command given: {command}")
-        
+
         logger.debug("send job to API")
         res = self.post(
-            f"processes/{command}/execution", data=json.dumps(job, default=str), timeout=self.timeout
+            f"processes/{command}/execution",
+            data=json.dumps(job, default=str),
+            timeout=self.timeout,
         )
 
         if res.status_code != 201:

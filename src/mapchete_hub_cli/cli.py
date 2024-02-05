@@ -41,25 +41,27 @@ def _check_dask_specs(ctx, param, dask_specs):
             return json.loads(src.read())
 
 
-def _get_timestamp(ctx, param, timestamp):
+def str_to_date(date_str):
+    """Convert string to datetime object."""
+    if "T" in date_str:
+        add_zulu = "Z" if date_str.endswith("Z") else ""
+        try:
+            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%f" + add_zulu)
+        except ValueError:
+            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S" + add_zulu)
+    else:
+        return datetime(*map(int, date_str.split("-")))
+
+
+def date_to_str(date_obj, microseconds=True):
+    """Return string from datetime object in the format."""
+    return date_obj.strftime(
+        "%Y-%m-%dT%H:%M:%S.%fZ" if microseconds else "%Y-%m-%dT%H:%M:%SZ"
+    )
+
+
+def _get_timestamp(_, __, timestamp):
     """Convert timestamp to datetime object."""
-
-    def str_to_date(date_str):
-        """Convert string to datetime object."""
-        if "T" in date_str:
-            add_zulu = "Z" if date_str.endswith("Z") else ""
-            try:
-                return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%f" + add_zulu)
-            except ValueError:
-                return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S" + add_zulu)
-        else:
-            return datetime(*map(int, date_str.split("-")))
-
-    def date_to_str(date_obj, microseconds=True):
-        """Return string from datetime object in the format."""
-        return date_obj.strftime(
-            "%Y-%m-%dT%H:%M:%S.%fZ" if microseconds else "%Y-%m-%dT%H:%M:%SZ"
-        )
 
     if timestamp:
         try:
@@ -67,22 +69,20 @@ def _get_timestamp(ctx, param, timestamp):
             timestamp = str_to_date(timestamp)
         except ValueError:
             # for a time range like '1d', '12h', '30m'
-            try:
-                time_types = {
-                    "d": "days",
-                    "h": "hours",
-                    "m": "minutes",
-                    "s": "seconds",
-                }
-                for k, v in time_types.items():
-                    if timestamp.endswith(k):
-                        timestamp = datetime.utcnow() - timedelta(
-                            **{v: int(timestamp[:-1])}
-                        )
-                        break
-                else:
-                    raise ValueError()
-            except ValueError:
+            time_types = {
+                "w": "weeks",
+                "d": "days",
+                "h": "hours",
+                "m": "minutes",
+                "s": "seconds",
+            }
+            for k, v in time_types.items():
+                if timestamp.endswith(k):
+                    timestamp = datetime.utcnow() - timedelta(
+                        **{v: int(timestamp[:-1])}
+                    )
+                    break
+            else:
                 raise click.BadParameter(
                     """either provide a timestamp like '2019-11-01T15:00:00' or a time """
                     """range in the format '1d', '12h', '30m', etc."""
@@ -149,7 +149,7 @@ opt_bounds = click.option(
 opt_bounds_crs = click.option(
     "--bounds-crs",
     type=click.STRING,
-    help="CRS of --bounds. (default: process CRS)",
+    help="CRS of --bounds.  [default: process CRS]",
 )
 opt_area = click.option(
     "--area",
@@ -160,7 +160,7 @@ opt_area = click.option(
 opt_area_crs = click.option(
     "--area-crs",
     type=click.STRING,
-    help="CRS of --area (does not override CRS of vector file). (default: process CRS)",
+    help="CRS of --area (does not override CRS of vector file).  [default: process CRS]",
 )
 opt_point = click.option(
     "--point",
@@ -170,7 +170,7 @@ opt_point = click.option(
     help="Process tiles over single point location.",
 )
 opt_point_crs = click.option(
-    "--point-crs", type=click.STRING, help="CRS of --point. (default: process CRS)"
+    "--point-crs", type=click.STRING, help="CRS of --point.  [default: process CRS]"
 )
 opt_tile = click.option(
     "--tile", "-t", type=click.INT, nargs=3, help="Zoom, row, column of single tile."
@@ -222,12 +222,14 @@ opt_dask_max_submitted_tasks = click.option(
     type=click.INT,
     default=1000,
     help="Limit number of tasks being submitted to dask scheduler at once.",
+    show_default=True,
 )
 opt_dask_chunksize = click.option(
     "--dask-chunksize",
     type=click.INT,
     default=100,
     help="Number tasks being submitted per request to dask scheduler at once.",
+    show_default=True,
 )
 opt_dask_no_task_graph = click.option(
     "--dask-no-task-graph",
@@ -240,6 +242,7 @@ opt_since = click.option(
     callback=_get_timestamp,
     help="Filter jobs by timestamp since given time.",
     default="7d",
+    show_default=True,
 )
 opt_since_no_default = click.option(
     "--since",
@@ -252,6 +255,14 @@ opt_until = click.option(
     type=click.STRING,
     callback=_get_timestamp,
     help="Filter jobs by timestamp until given time.",
+)
+opt_until_1d_ago = click.option(
+    "--until",
+    type=click.STRING,
+    callback=_get_timestamp,
+    default="1d",
+    help="Filter jobs by timestamp until given time.",
+    show_default=True,
 )
 opt_job_ids = click.option(
     "--job-ids",
@@ -271,7 +282,8 @@ opt_sort_by = click.option(
     "--sort-by",
     type=click.Choice(["started", "runtime", "status", "progress"]),
     default="status",
-    help="Sort jobs. (default: status)",
+    help="Sort jobs.",
+    show_default=True,
 )
 opt_mhub_user = click.option(
     "--user",
@@ -292,7 +304,6 @@ opt_make_zones = click.option(
     "--make-zones-on-zoom",
     "-zz",
     type=click.INT,
-    default=None,
     help="Split up job into smaller jobs using a specified zoom level grid.",
 )
 opt_full_zones = click.option(
@@ -305,20 +316,21 @@ opt_zones_wait_count = click.option(
     "-zwc",
     type=click.INT,
     default=MHUB_CLI_ZONES_WAIT_TILES_COUNT,
-    help=f"Threshold for at how many submitted zones the mhub cli should wait, only triggers when --make-zones-on-zoom is used. (default: {MHUB_CLI_ZONES_WAIT_TILES_COUNT})",
+    help="Threshold for at how many submitted zones the mhub cli should wait, only triggers when --make-zones-on-zoom is used.",
+    show_default=True,
 )
 opt_zones_wait_seconds = click.option(
     "--zones-wait-seconds",
     "-zws",
     type=click.INT,
     default=MHUB_CLI_ZONES_WAIT_TIME_SECONDS,
-    help=f"How long should the mhub cli wait until submitting next zone in seconds, only triggers when --make-zones-on-zoom is used. (default: {MHUB_CLI_ZONES_WAIT_TIME_SECONDS})",
+    help="How long should the mhub cli wait until submitting next zone in seconds, only triggers when --make-zones-on-zoom is used.",
+    show_default=True,
 )
 opt_zone = click.option(
     "--zone",
     type=click.INT,
     nargs=3,
-    default=None,
     help="Run on Zone defined by process pyramid grid.",
 )
 
@@ -331,14 +343,15 @@ opt_zone = click.option(
     type=click.STRING,
     nargs=1,
     default=f"{host_options['host_ip']}:{host_options['port']}",
-    help="""Address and port of mhub endpoint (default: """
-    f"""{host_options['host_ip']}:{host_options['port']}). (Or set MHUB_HOST env variable.)""",
+    help="Address and port of mhub endpoint",
+    show_default=True,
 )
 @click.option(
     "--timeout",
     type=click.INT,
     default=DEFAULT_TIMEOUT,
-    help=f"Time in seconds to wait for server response. (default: {DEFAULT_TIMEOUT})",
+    help="Time in seconds to wait for server response.",
+    show_default=True,
 )
 @click.option(
     "--remote-versions",
@@ -703,7 +716,7 @@ def jobs(
 
 @mhub.command(short_help="Show available processes.")
 @click.option(
-    "--process_name", "-n", type=click.STRING, help="Print docstring of process."
+    "--process-name", "-n", type=click.STRING, help="Print docstring of process."
 )
 @click.option("--docstrings", is_flag=True, help="Print docstrings of all processes.")
 @opt_debug
@@ -807,6 +820,40 @@ def retry(
             for job_id in job_ids:
                 job = Client(**ctx.obj).retry_job(job_id, use_old_image=use_old_image)
                 click.echo(f"job {job.job_id} {job.status}")
+    except Exception as e:  # pragma: no cover
+        if debug:
+            raise
+        raise click.ClickException(e)
+
+
+@mhub.command(short_help="Abort stalled jobs.")
+@click.pass_context
+@opt_until_1d_ago
+@opt_force
+@opt_debug
+def clean(
+    ctx,
+    until=None,
+    force=False,
+    debug=False,
+):
+    try:
+        client = Client(**ctx.obj)
+        jobs = client.jobs(status=["parsing", "initializing", "running"], to_date=until)
+        click.echo(f"found {len(jobs)} stalled jobs")
+        if jobs:
+            for job_id, job in jobs.items():
+                click.echo(
+                    f"{job_id}: {job.status}, last update on {job.properties.get('updated')}"
+                )
+            if force or click.confirm(
+                f"Do you really want to cancel {len(jobs)} job(s)?", abort=True
+            ):
+                for job_id in jobs:
+                    job = client.cancel_job(job_id)
+                    logger.debug(job.to_dict())
+                    click.echo(f"job {job.status}")
+
     except Exception as e:  # pragma: no cover
         if debug:
             raise
