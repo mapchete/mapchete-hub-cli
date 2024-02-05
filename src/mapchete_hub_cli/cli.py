@@ -295,6 +295,11 @@ opt_make_zones = click.option(
     default=None,
     help="Split up job into smaller jobs using a specified zoom level grid.",
 )
+opt_full_zones = click.option(
+    "--full-zones",
+    is_flag=True,
+    help="Create full zones instead of intersection with bounds. (Only has effect with --make-zones-on-zoom.)",
+)
 opt_zones_wait_count = click.option(
     "--zones-wait-count",
     "-zwc",
@@ -424,6 +429,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
 @opt_debug
 @opt_job_name
 @opt_make_zones
+@opt_full_zones
 @opt_zones_wait_count
 @opt_zones_wait_seconds
 @opt_zone
@@ -439,6 +445,7 @@ def execute(
     dask_max_submitted_tasks=1000,
     dask_chunksize=100,
     make_zones_on_zoom=None,
+    full_zones=False,
     zones_wait_count=5,
     zones_wait_seconds=10,
     job_name=None,
@@ -475,16 +482,19 @@ def execute(
                         if job_name
                         else None
                     )
+                    process_bounds = (
+                        bounds_intersection(bounds, tile.bounds())
+                        if (bounds and not full_zones)
+                        else tile.bounds()
+                    )
                     if len(tiles) >= zones_wait_count:
-                        sleep(zones_wait_seconds) 
+                        sleep(zones_wait_seconds)
                     job = Client(**ctx.obj).start_job(
                         command="execute",
                         config=mapchete_file,
                         params=dict(
                             kwargs,
-                            bounds=bounds_intersection(bounds, tile.bounds())
-                            if bounds
-                            else tile.bounds(),
+                            bounds=process_bounds,
                             mode="overwrite" if overwrite else "continue",
                             dask_settings=dask_settings,
                             job_name=zone_job_name,
