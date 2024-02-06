@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
+from typing import Union
 
 
-def str_to_date(date_str) -> datetime:
+def str_to_date(date_str: str) -> datetime:
     """Convert string to datetime object."""
     if "T" in date_str:
         add_zulu = "Z" if date_str.endswith("Z") else ""
@@ -18,8 +19,10 @@ def str_to_date(date_str) -> datetime:
         return datetime(year, month, day)
 
 
-def date_to_str(date_obj, microseconds=True) -> str:
+def date_to_str(date_obj: Union[str, datetime], microseconds=True) -> str:
     """Return string from datetime object in the format."""
+    if isinstance(date_obj, str):
+        date_obj = str_to_date(date_obj)
     return date_obj.strftime(
         "%Y-%m-%dT%H:%M:%S.%fZ" if microseconds else "%Y-%m-%dT%H:%M:%SZ"
     )

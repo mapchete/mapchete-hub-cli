@@ -1,9 +1,10 @@
 import os
 from uuid import uuid4
 
-import click
 import pytest
 import requests
+
+from mapchete_hub_cli.enums import Status
 
 TEST_ENDPOINT = os.environ.get("MHUB_HOST", "http://0.0.0.0:5000")
 
@@ -38,24 +39,18 @@ def test_remote_versions(cli):
     not ENDPOINT_AVAILABLE,
     reason="requires up and running endpoint using docker-compose",
 )
-def test_dask_specs(cli):
-    result = cli.run("dask-specs")
-    assert result.exit_code == 0
-    assert "default" in result.output
-
-
-@pytest.mark.skipif(
-    not ENDPOINT_AVAILABLE,
-    reason="requires up and running endpoint using docker-compose",
-)
 def test_execute(mhub_integration_client, cli, example_config_mapchete):
     result = cli.run(f"execute {example_config_mapchete.path}")
-    assert result.exit_code == 0
+    try:
+        assert result.exit_code == 0
+    except AssertionError:
+        print(result.output.strip())
+        raise
     job_id = result.output.strip()
 
     job = mhub_integration_client.job(job_id)
     job.wait(wait_for_max=120)
-    assert mhub_integration_client.job(job_id).status == "done"
+    assert mhub_integration_client.job(job_id).status == Status.done
 
 
 @pytest.mark.skipif(
@@ -88,8 +83,8 @@ def test_execute_progress(mhub_integration_client, cli, example_config_mapchete)
 
     jobs = mhub_integration_client.jobs(job_name=job_name)
     assert len(jobs) == 1
-    for k, v in jobs.items():
-        assert v.status == "done"
+    for job in jobs:
+        assert job.status == Status.done
 
 
 @pytest.mark.skipif(
@@ -125,6 +120,7 @@ def test_progress(mhub_integration_client, cli, example_config_mapchete):
     job_id = result.output.strip()
 
     result = cli.run(f"progress {job_id}")
+    print(result.output)
     assert result.exit_code == 0
 
 
@@ -160,6 +156,7 @@ def test_cancel_by_search(mhub_integration_client, cli, example_config_mapchete)
 
     # cancel job
     result = cli.run("cancel --since 1m -f")
+    print(result.output)
     assert result.exit_code == 0
 
     # wait and make sure it is cancelled
@@ -196,7 +193,7 @@ def test_job(mhub_integration_client, cli, example_config_mapchete):
     # print job params
     result = cli.run(f"job {job_id} --show-params")
     assert result.exit_code == 0
-    assert "bounds" in result.output
+    assert "mode" in result.output
 
     # print job process
     result = cli.run(f"job {job_id} --show-process")
@@ -330,7 +327,7 @@ def test_retry_by_job_id(mhub_integration_client, cli, example_config_mapchete):
     # wait and make sure it is finished
     job = mhub_integration_client.job(job_id)
     job.wait(wait_for_max=120, raise_exc=False)
-    assert mhub_integration_client.job(job_id).status == "done"
+    assert mhub_integration_client.job(job_id).status == Status.done
 
     # retry job
     result = cli.run(f"retry -j {job_id} -f")
@@ -350,7 +347,7 @@ def test_retry_by_search(mhub_integration_client, cli, example_config_mapchete):
     # wait and make sure it is finished
     job = mhub_integration_client.job(job_id)
     job.wait(wait_for_max=120, raise_exc=False)
-    assert mhub_integration_client.job(job_id).status == "done"
+    assert mhub_integration_client.job(job_id).status == Status.done
 
     # retry job
     result = cli.run("retry --since 5s -f")

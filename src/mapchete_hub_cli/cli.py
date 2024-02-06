@@ -16,10 +16,10 @@ from mapchete_hub_cli import (
     MHUB_CLI_ZONES_WAIT_TILES_COUNT,
     MHUB_CLI_ZONES_WAIT_TIME_SECONDS,
     Client,
-    Job,
     __version__,
     load_mapchete_config,
 )
+from mapchete_hub_cli.enums import Status
 from mapchete_hub_cli.exceptions import JobFailed
 from mapchete_hub_cli.log import set_log_level
 from mapchete_hub_cli.time import (
@@ -355,11 +355,12 @@ def mhub(ctx, host, **kwargs):
 @click.pass_context
 def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
     """Cancel jobs and their follow-up jobs if batch was submitted."""
+    client = Client(**ctx.obj)
     try:
         kwargs.update(from_date=kwargs.pop("since"), to_date=kwargs.pop("until"))
 
         if job_ids:
-            jobs = [Client(**ctx.obj).job(job_id) for job_id in job_ids]
+            jobs = [client.job(job_id) for job_id in job_ids]
 
         else:
             if all([v is None for v in kwargs.values()]):  # pragma: no cover
@@ -367,7 +368,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
                 raise click.UsageError(
                     "Please either provide one or more job IDs or other search values."
                 )
-            jobs = Client(**ctx.obj).jobs(**kwargs).values()
+            jobs = client.jobs(**kwargs)
 
         def _yield_revokable_jobs(jobs):
             for j in jobs:
@@ -388,7 +389,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
             f"Do you really want to cancel {len(job_ids)} job(s)?", abort=True
         ):
             for job_id in job_ids:
-                job = Client(**ctx.obj).cancel_job(job_id)
+                job = client.cancel_job(job_id)
                 logger.debug(job.to_dict())
                 click.echo(f"job {job.status}")
 
@@ -444,6 +445,7 @@ def execute(
         max_submitted_tasks=dask_max_submitted_tasks,
         chunksize=dask_chunksize,
     )
+    client = Client(**ctx.obj)
     for mapchete_file in mapchete_files:
         try:
             if make_zones_on_zoom is not None and bounds is None:
@@ -475,7 +477,7 @@ def execute(
                     )
                     if len(tiles) >= zones_wait_count:
                         sleep(zones_wait_seconds)
-                    job = Client(**ctx.obj).start_job(
+                    job = client.start_job(
                         command="execute",
                         config=mapchete_file,
                         params=dict(
@@ -488,7 +490,7 @@ def execute(
                     )
                     click.echo(job.job_id)
             else:
-                job = Client(**ctx.obj).start_job(
+                job = client.start_job(
                     command="execute",
                     config=mapchete_file,
                     params=dict(
@@ -501,12 +503,12 @@ def execute(
                 )
                 if verbose:  # pragma: no cover
                     click.echo(f"job {job.job_id} {job.status}")
-                    job = Client(**ctx.obj).job(job.job_id)
+                    job = client.job(job.job_id)
                     if job.properties.get("dask_dashboard_link"):
                         click.echo(
                             f"dask dashboard: {job.properties.get('dask_dashboard_link')}"
                         )
-                    _show_progress(ctx, job.job_id, disable=debug)
+                    _show_progress(client, job.job_id, disable=debug)
                 else:
                     click.echo(job.job_id)
         except Exception as e:  # pragma: no cover
@@ -546,34 +548,33 @@ def job(
     determine the most recently updated job.
     """
     try:
-        job = Client(**ctx.obj).job(job_id, geojson=geojson)
+        client = Client(**ctx.obj)
+        job = client.job(job_id)
         if geojson:  # pragma: no cover
-            click.echo(job)
+            click.echo(job.to_json())
             return
         elif show_config:
-            click.echo(
-                yaml.dump(job.to_dict()["properties"]["mapchete"]["config"], indent=2)
-            )
+            click.echo(yaml.dump(job.properties["mapchete"]["config"], indent=2))
             return
         elif show_params:
-            for k, v in job.to_dict()["properties"]["mapchete"]["params"].items():
+            for k, v in job.properties["mapchete"]["params"].items():
                 if isinstance(v, list):
                     click.echo(f"{k}: {', '.join(map(str, v)) if v else None}")
                 else:
                     click.echo(f"{k}: {v}")
             return
         elif show_process:
-            process = job.to_dict()["properties"]["mapchete"]["config"].get("process")
+            process = job.properties["mapchete"]["config"].get("process")
             process = process if isinstance(process, list) else [process]
             for line in process:
                 click.echo(line)
             return
         elif traceback:  # pragma: no cover
-            click.echo(job.to_dict()["properties"].get("exception"))
-            click.echo(job.to_dict()["properties"].get("traceback"))
+            click.echo(job.properties.get("exception"))
+            click.echo(job.properties.get("traceback"))
         if progress:  # pragma: no cover
             click.echo(f"job {job.job_id} {job.status}")
-            _show_progress(ctx, job_id, disable=debug)
+            _show_progress(client, job_id, disable=debug)
         else:
             _print_job_details(job, metadata_items=metadata_items, verbose=True)
     except Exception as e:  # pragma: no cover
@@ -608,9 +609,10 @@ def progress(
     determine the most recently updated job.
     """
     try:
-        job = Client(**ctx.obj).job(job_id)
+        client = Client(**ctx.obj)
+        job = client.job(job_id)
         click.echo(f"job {job.job_id} {job.status}")
-        _show_progress(ctx, job_id, disable=debug, interval=interval)
+        _show_progress(client, job_id, disable=debug, interval=interval)
     except Exception as e:  # pragma: no cover
         if debug:
             raise
@@ -669,13 +671,12 @@ def jobs(
 
     kwargs.update(from_date=kwargs.pop("since"), to_date=kwargs.pop("until"))
     try:
+        client = Client(**ctx.obj)
         if geojson:
-            click.echo(Client(**ctx.obj).jobs(geojson=True, **kwargs))
+            click.echo(client.jobs(geojson=True, **kwargs))
         else:
             # sort by status and then by timestamp
-            jobs = _sort_jobs(
-                Client(**ctx.obj).jobs(**kwargs).values(), sort_by=sort_by
-            )
+            jobs = _sort_jobs(client.jobs(**kwargs), sort_by=sort_by)
             logger.debug(jobs)
             if verbose:
                 click.echo(f"{len(jobs)} jobs found. \n")
@@ -705,7 +706,8 @@ def processes(ctx, process_name=None, docstrings=False, debug=None, **kwargs):
             click.echo(process_module["description"])
 
     try:
-        res = Client(**ctx.obj).get("processes")
+        client = Client(**ctx.obj)
+        res = client.get("processes")
         if res.status_code != 200:  # pragma: no cover
             raise ConnectionError(res.json())
 
@@ -756,8 +758,9 @@ def retry(
     kwargs.update(from_date=kwargs.pop("since"), to_date=kwargs.pop("until"))
 
     try:
+        client = Client(**ctx.obj)
         if job_ids:
-            jobs = [Client(**ctx.obj).job(job_id) for job_id in job_ids]
+            jobs = [client.job(job_id) for job_id in job_ids]
 
         else:
             if all([v is None for v in kwargs.values()]):  # pragma: no cover
@@ -765,7 +768,7 @@ def retry(
                 raise click.UsageError(
                     "Please either provide one or more job IDs or other search values."
                 )
-            jobs = Client(**ctx.obj).jobs(**kwargs).values()
+            jobs = client.jobs(**kwargs)
 
         def _yield_retryable_jobs(jobs):
             for j in jobs:
@@ -789,7 +792,7 @@ def retry(
             f"Do you really want to retry {len(job_ids)} job(s)?", abort=True
         ):
             for job_id in job_ids:
-                job = Client(**ctx.obj).retry_job(job_id, use_old_image=use_old_image)
+                job = client.retry_job(job_id, use_old_image=use_old_image)
                 click.echo(f"job {job.job_id} {job.status}")
     except Exception as e:  # pragma: no cover
         if debug:
@@ -859,9 +862,7 @@ def clean(
                     click.echo(f"job {job_id} {cancelled_job.status}")
                     if retry:
                         client.retry_job(job_id)
-                        job = Client(**ctx.obj).retry_job(
-                            job_id, use_old_image=use_old_image
-                        )
+                        job = client.retry_job(job_id, use_old_image=use_old_image)
                         click.echo(f"job {job.job_id} {job.status}")
         else:
             click.echo("no stalled jobs found")
@@ -884,8 +885,9 @@ def _stalled_jobs(
 
     # jobs which have been pending for too long
     for job in client.jobs(
-        status="pending", to_date=date_to_str(passed_time_to_timestamp(pending_since))
-    ).values():
+        status=Status.pending,
+        to_date=date_to_str(passed_time_to_timestamp(pending_since)),
+    ):
         logger.debug(
             "job %s %s state since %s", job.job_id, job.status, job.last_updated
         )
@@ -895,11 +897,11 @@ def _stalled_jobs(
         stalled.add(job.job_id)
 
     # jobs which have been inactive for too long
-    for status in ["parsing", "initializing", "running"]:
+    for status in [Status.parsing, Status.initializing, Status.running]:
         for job in client.jobs(
             status=status,
             to_date=date_to_str(passed_time_to_timestamp(inactive_since)),
-        ).values():
+        ):
             logger.debug(
                 "job %s %s but has been inactive since %s",
                 job.job_id,
@@ -913,7 +915,7 @@ def _stalled_jobs(
 
     # running jobs with unavailable dashboard
     if check_inactive_dashboard:
-        for job in client.jobs(status="running").values():
+        for job in client.jobs(status=Status.running):
             dashboard_link = job.properties.get("dask_dashboard_link")
             # NOTE: jobs can be running without haveing a dashboard
             if dashboard_link:
@@ -1007,11 +1009,9 @@ def _print_job_details(job, metadata_items=None, verbose=False):
         click.echo("")
 
 
-def _show_progress(ctx, job_id, disable=False, interval=0.3):
+def _show_progress(client, job_id, disable=False, interval=0.3):
     try:
-        progress_iter = (
-            Client(**ctx.obj).job(job_id).progress(smooth=True, interval=interval)
-        )
+        progress_iter = client.job(job_id).progress(smooth=True, interval=interval)
         click.echo("wait for job progress...")
         i = next(progress_iter)
         last_progress = i["current_progress"]

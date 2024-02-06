@@ -13,7 +13,7 @@ from mapchete_hub_cli import Client
 from mapchete_hub_cli.cli import mhub
 
 _fake_backend_db = init_backenddb("memory")
-_dask_cluster = LocalCluster()
+# _dask_cluster = LocalCluster()
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -23,7 +23,7 @@ def fake_backend_db():
 
 
 def local_dask_cluster():
-    return {"flavor": "local_cluster", "cluster": _dask_cluster}
+    return {"flavor": "local_cluster", "cluster": LocalCluster()}
 
 
 app.dependency_overrides[get_backend_db] = fake_backend_db
@@ -52,7 +52,7 @@ def cli():
             self.cli_func = cli_func
 
         def run(self, command):
-            return CliRunner().invoke(
+            result = CliRunner().invoke(
                 self.cli_func,
                 [
                     "--host",
@@ -60,6 +60,9 @@ def cli():
                     *command.split(" "),
                 ],
             )
+            if result.exit_code != 0:
+                print(result.output)
+            return result
 
     return CLI(mhub)
 

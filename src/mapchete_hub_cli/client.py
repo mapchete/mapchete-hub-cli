@@ -15,7 +15,7 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from json.decoder import JSONDecodeError
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Generator, Iterator, List, Optional, Tuple, Union
 
 import oyaml as yaml
 import requests
@@ -23,13 +23,12 @@ from requests.exceptions import HTTPError
 
 from mapchete_hub_cli.enums import Status
 from mapchete_hub_cli.exceptions import (
-    JobAborting,
     JobCancelled,
     JobFailed,
     JobNotFound,
     JobRejected,
 )
-from mapchete_hub_cli.time import str_to_date
+from mapchete_hub_cli.time import date_to_str, passed_time_to_timestamp, str_to_date
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +38,12 @@ MHUB_CLI_ZONES_WAIT_TILES_COUNT = int(
 MHUB_CLI_ZONES_WAIT_TIME_SECONDS = int(
     os.environ.get("MHUB_CLI_ZONES_WAIT_TIME_SECONDS", "10")
 )
-
 DEFAULT_TIMEOUT = int(os.environ.get("MHUB_CLI_DEFAULT_TIMEOUT", "5"))
+
 JOB_STATUSES = {
-    "todo": ["pending"],
-    "doing": ["parsing", "initializing", "retrying", "running"],
-    "done": ["aborting", "done", "failed", "cancelled"],
+    "todo": [Status.pending],
+    "doing": [Status.parsing, Status.initializing, Status.retrying, Status.running],
+    "done": [Status.done, Status.failed, Status.cancelled],
 }
 COMMANDS = ["execute"]
 
@@ -53,10 +52,8 @@ COMMANDS = ["execute"]
 class Job:
     """Job metadata class."""
 
-    status_code: int
     status: Status
     job_id: str
-    exists: bool
     geoemtry: dict
     __geo_interface__: dict
     bounds: tuple
@@ -66,20 +63,10 @@ class Job:
     _dict: dict
 
     @staticmethod
-    def from_response(res: requests.Response, client: Optional[Client] = None) -> Job:
-        return Job.from_dict(
-            response_dict=res.json(), status_code=res.status_code, client=client
-        )
-
-    @staticmethod
-    def from_dict(
-        response_dict: dict, status_code: int, client: Optional[Client] = None
-    ) -> Job:
+    def from_dict(response_dict: dict, client: Optional[Client] = None) -> Job:
         return Job(
-            status_code=status_code,
             status=Status[response_dict["properties"]["status"]],
             job_id=response_dict["id"],
-            exists=True if status_code == 409 else False,
             geoemtry=response_dict["geometry"],
             __geo_interface__=response_dict["geometry"],
             bounds=tuple(response_dict["bounds"]),
@@ -97,7 +84,7 @@ class Job:
 
     def __repr__(self):  # pragma: no cover
         """Print Job."""
-        return f"Job(status_code={self.status_code}, status={self.status}, job_id={self.job_id}, updated={self.properties.get('updated')}"
+        return f"Job(status={self.status}, job_id={self.job_id}, updated={self.last_updated}"
 
     def wait(self, wait_for_max=None, raise_exc=True):
         """Block until job has finished processing."""
@@ -127,6 +114,53 @@ class Job:
                 last_progress = current_progress
         else:
             yield from progress_iter
+
+
+@dataclass
+class Jobs:
+    client: Client
+    _response_dict: dict
+    _jobs: Tuple[Job, ...]
+
+    @staticmethod
+    def from_dict(response_dict: dict, client: Client) -> Jobs:
+        return Jobs(
+            client=client,
+            _jobs=tuple(
+                Job.from_dict(job, client=client) for job in response_dict["features"]
+            ),
+            _response_dict=response_dict,
+        )
+
+    def last_job(self) -> Job:
+        return list(sorted(list(self._jobs), key=lambda x: x.last_updated))[-1]
+
+    def __iter__(self) -> Iterator[Job]:
+        return iter(self._jobs)
+
+    def __len__(self) -> int:
+        return len(self._jobs)
+
+    def __getitem__(self, job_id: str) -> Job:
+        for _job in self._jobs:
+            if job_id == _job.job_id:
+                return _job
+        else:
+            raise KeyError(f"job with id {job_id} not in {self}")
+
+    def __contains__(self, job: Union[Job, str]) -> bool:
+        job_id = job.job_id if isinstance(job, Job) else job
+        try:
+            self[job_id]
+            return True
+        except KeyError:
+            return False
+
+    def to_dict(self) -> dict:
+        return self._response_dict
+
+    def to_json(self, indent: int = 4) -> str:
+        return json.dumps(self.to_dict(), indent=indent)
 
 
 class Client:
@@ -200,20 +234,19 @@ class Client:
         """Make a DELETE request to _test_client or host."""
         return self._request("DELETE", url, **kwargs)
 
-    def get_last_job_id(self) -> str:
+    def get_last_job_id(self, since: str = "1d") -> str:
         """
         Return ID of latest job if requested.
         """
-        one_day_ago = (
-            datetime.datetime.utcnow() - datetime.timedelta(days=1)
-        ).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-        jobs = [j[1] for j in self.jobs(from_date=one_day_ago).items()]
+        jobs = self.jobs(from_date=passed_time_to_timestamp(since))
         if len(jobs) == 0:  # pragma: no cover
-            raise JobNotFound("cannot find recent job in the past day")
-        last_job = list(sorted(jobs, key=lambda x: x.properties.get("updated") or 0.0))[
-            -1
-        ]
-        return last_job.job_id
+            raise JobNotFound(f"cannot find recent job since {since}")
+        return jobs.last_job().job_id
+
+    def parse_job_id(self, job_id: str) -> str:
+        if job_id == ":last:":
+            return self.get_last_job_id()
+        return job_id
 
     def start_job(
         self,
@@ -256,12 +289,18 @@ class Client:
         -------
         mapchete_hub.api.Job
         """
+        if params is None:
+            params = {}
+        elif isinstance(params, dict):
+            params = {k: v for k, v in params.items() if v is not None}
+        else:
+            raise JobRejected(f"params must be None or a dictionary, not '{params}'")
+
         job = OrderedDict(
             command=command,
             config=load_mapchete_config(config, basedir=basedir),
-            params=params or {},
+            params=params,
         )
-
         # make sure correct command is provided
         if command not in COMMANDS:  # pragma: no cover
             raise ValueError(f"invalid command given: {command}")
@@ -281,7 +320,7 @@ class Client:
         else:
             job_id = res.json()["id"]
             logger.debug(f"job {job_id} sent")
-            return Job.from_response(res, client=self)
+            return Job.from_dict(res.json(), client=self)
 
     def cancel_job(self, job_id: str) -> Job:
         """
@@ -293,12 +332,11 @@ class Client:
             Can either be a valid job ID or :last:, in which case the CLI will automatically
             determine the most recently updated job.
         """
-        if job_id == ":last:":
-            job_id = self.get_last_job_id()
+        job_id = self.parse_job_id(job_id)
         res = self.delete(f"jobs/{job_id}", timeout=self.timeout)
         if res.status_code == 404:
             raise JobNotFound(f"job {job_id} does not exist")
-        return Job.from_response(res, client=self)
+        return Job.from_dict(res.json(), client=self)
 
     def retry_job(self, job_id: str, use_old_image: bool = False) -> Job:
         """
@@ -317,10 +355,8 @@ class Client:
         -------
         mapchete_hub.api.Job
         """
-        if job_id == ":last:":
-            job_id = self.get_last_job_id()
-        existing_job = self.job(job_id)
-        params = existing_job.to_dict()["properties"]["mapchete"]["params"].copy()
+        existing_job = self.job(self.parse_job_id(job_id))
+        params = existing_job.properties["mapchete"]["params"].copy()
         if not use_old_image:
             # make sure to remove image from params because otherwise the job will be retried
             # using outdated software
@@ -329,12 +365,12 @@ class Client:
             except KeyError:
                 pass
         return self.start_job(
-            config=existing_job.to_dict()["properties"]["mapchete"]["config"],
-            command=existing_job.to_dict()["properties"]["mapchete"]["command"],
+            config=existing_job.properties["mapchete"]["config"],
+            command=existing_job.properties["mapchete"]["command"],
             params=params,
         )
 
-    def job(self, job_id: str, geojson: bool = False, indent: int = 4) -> Job:
+    def job(self, job_id: str) -> Job:
         """
         Return job metadata.
 
@@ -344,13 +380,14 @@ class Client:
             Can either be a valid job ID or :last:, in which case the CLI will automatically
             determine the most recently updated job.
         """
-        if job_id == ":last:":
-            job_id = self.get_last_job_id()
+        job_id = self.parse_job_id(job_id)
         res = self.get(f"jobs/{job_id}", timeout=self.timeout)
-        if res.status_code == 404:
+        if res.status_code == 200:
+            return Job.from_dict(res.json(), client=self)
+        elif res.status_code == 404:
             raise JobNotFound(f"job {job_id} does not exist")
         else:
-            return Job.from_response(res, client=self)
+            raise ValueError(f"return code should be 200, but is {res.status_code}")
 
     def job_status(self, job_id: str) -> Status:
         """
@@ -362,42 +399,43 @@ class Client:
             Can either be a valid job ID or :last:, in which case the CLI will automatically
             determine the most recently updated job.
         """
-        if job_id == ":last:":
-            job_id = self.get_last_job_id()
-        return self.job(job_id).status
+        return self.job(self.parse_job_id(job_id)).status
 
-    def jobs(self, bounds=None, **kwargs) -> Tuple[Job, ...]:
-        """Return jobs metadata."""
+    def jobs(
+        self,
+        bounds: Optional[Union[List, Tuple]] = None,
+        from_date: Optional[Union[str, datetime.datetime]] = None,
+        to_date: Optional[Union[str, datetime.datetime]] = None,
+        status: Optional[Union[List[Status], Status]] = None,
+        **kwargs,
+    ) -> Jobs:
         res = self.get(
             "jobs",
             timeout=self.timeout,
-            params=dict(kwargs, bounds=",".join(map(str, bounds)) if bounds else None),
+            params=dict(
+                kwargs,
+                bounds=",".join(map(str, bounds)) if bounds else None,
+                from_date=date_to_str(from_date) if from_date else None,
+                to_date=date_to_str(to_date) if to_date else None,
+                status=",".join([s.name for s in to_statuses(status)])
+                if status
+                else None,
+            ),
         )
         if res.status_code != 200:  # pragma: no cover
             try:
                 raise Exception(res.json())
             except JSONDecodeError:  # pragma: no cover
                 raise Exception(res.text)
-        return tuple(
-            Job.from_dict(job, res.status_code, client=self)
-            for job in res.json()["features"]
-        )
+        return Jobs.from_dict(res.json(), client=self)
 
-    def jobs_geojson(self, indent=4, bounds=None, **kwargs) -> str:
-        """Return jobs metadata."""
-        res = self.get(
-            "jobs",
-            timeout=self.timeout,
-            params=dict(kwargs, bounds=",".join(map(str, bounds)) if bounds else None),
-        )
-        if res.status_code != 200:  # pragma: no cover
-            try:
-                raise Exception(res.json())
-            except JSONDecodeError:  # pragma: no cover
-                raise Exception(res.text)
-        return json.dumps(res.json(), indent=indent)
-
-    def job_progress(self, job_id, interval=0.3, wait_for_max=None, raise_exc=True):
+    def job_progress(
+        self,
+        job_id: str,
+        interval: float = 0.3,
+        wait_for_max: Optional[float] = None,
+        raise_exc: bool = True,
+    ) -> Generator[dict, None, None]:
         """
         Yield job progress information.
 
@@ -407,12 +445,10 @@ class Client:
             Can either be a valid job ID or :last:, in which case the CLI will automatically
             determine the most recently updated job.
         """
-        if job_id == ":last:":
-            job_id = self.get_last_job_id()
         start = time.time()
         last_progress = 0
         while True:
-            job = self.job(job_id)
+            job = self.job(self.parse_job_id(job_id))
             if (
                 wait_for_max is not None and time.time() - start > wait_for_max
             ):  # pragma: no cover
@@ -420,9 +456,9 @@ class Client:
                     f"job not done in time, last status was '{job.status}'"
                 )
             properties = job.to_dict()["properties"]
-            if job.status == "pending":  # pragma: no cover
+            if job.status == Status.pending:  # pragma: no cover
                 continue
-            elif job.status == "running" and properties.get("total_progress"):
+            elif job.status == Status.running and properties.get("total_progress"):
                 current_progress = properties["current_progress"]
                 if current_progress > last_progress:
                     yield dict(
@@ -431,22 +467,17 @@ class Client:
                         total_progress=properties["total_progress"],
                     )
                     last_progress = current_progress
-            elif job.status == "aborting":
+            elif job.status == Status.cancelled:  # pragma: no cover
                 if raise_exc:
-                    raise JobAborting(f"job {job_id} aborting")
+                    raise JobCancelled(f"job {job.job_id} cancelled")
                 else:
                     return
-            elif job.status == "cancelled":  # pragma: no cover
-                if raise_exc:
-                    raise JobCancelled(f"job {job_id} cancelled")
-                else:
-                    return
-            elif job.status == "failed":
+            elif job.status == Status.failed:
                 if raise_exc:
                     raise JobFailed(f"job failed with {properties['exception']}")
                 else:  # pragma: no cover
                     return
-            elif job.status == "done":
+            elif job.status == Status.done:
                 current_progress = properties.get("current_progress")
                 total_progress = properties.get("total_progress")
                 if (current_progress is not None and total_progress is not None) and (
@@ -546,3 +577,15 @@ def cleanup_datetime(value: Any) -> Any:
         return str(value)
     else:
         return value
+
+
+def to_statuses(status: Optional[Union[List[Status], Status]] = None) -> List[Status]:
+    def to_status(s: Union[str, Status]) -> Status:
+        return s if isinstance(s, Status) else Status[s]
+
+    if status is None:
+        return []
+    elif isinstance(status, list):
+        return [to_status(s) for s in status]
+    else:
+        return [to_status(status)]
