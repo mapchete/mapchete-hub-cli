@@ -19,6 +19,13 @@ def _endpoint_available():
 
 ENDPOINT_AVAILABLE = _endpoint_available()
 
+todo_or_doing = [
+    Status.pending,
+    Status.running,
+    Status.parsing,
+    Status.initializing,
+]
+
 
 def test_cli(cli):
     result = cli.run("--help")
@@ -141,7 +148,7 @@ def test_cancel_by_job_id(mhub_integration_client, cli, example_config_mapchete)
     # wait and make sure it is cancelled
     job = mhub_integration_client.job(job_id)
     job.wait(wait_for_max=120, raise_exc=False)
-    assert mhub_integration_client.job(job_id).status in ["aborting", "cancelled"]
+    assert mhub_integration_client.job(job_id).status == Status.cancelled
 
 
 @pytest.mark.skipif(
@@ -162,7 +169,7 @@ def test_cancel_by_search(mhub_integration_client, cli, example_config_mapchete)
     # wait and make sure it is cancelled
     job = mhub_integration_client.job(job_id)
     job.wait(wait_for_max=120, raise_exc=False)
-    assert mhub_integration_client.job(job_id).status in ["aborting", "cancelled"]
+    assert mhub_integration_client.job(job_id).status == Status.cancelled
 
 
 @pytest.mark.skipif(
