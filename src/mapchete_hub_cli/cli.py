@@ -1,11 +1,12 @@
 import json
 import logging
-from datetime import datetime, timedelta
 from itertools import chain
 from time import sleep
+from typing import Set
 
 import click
 import oyaml as yaml
+import requests
 from tqdm import tqdm
 
 from mapchete_hub_cli import (
@@ -15,11 +16,19 @@ from mapchete_hub_cli import (
     MHUB_CLI_ZONES_WAIT_TILES_COUNT,
     MHUB_CLI_ZONES_WAIT_TIME_SECONDS,
     Client,
+    Job,
     __version__,
     load_mapchete_config,
 )
 from mapchete_hub_cli.exceptions import JobFailed
 from mapchete_hub_cli.log import set_log_level
+from mapchete_hub_cli.time import (
+    date_to_str,
+    passed_time_to_timestamp,
+    pretty_time,
+    pretty_time_passed,
+    str_to_date,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,60 +37,29 @@ host_options = dict(host_ip="0.0.0.0", port=5000)
 
 # click callbacks #
 ###################
-def _set_debug_log_level(ctx, param, debug):
+def _set_debug_log_level(_, __, debug):
     if debug:  # pragma: no cover
         set_log_level(logging.DEBUG)
     return debug
 
 
-def _check_dask_specs(ctx, param, dask_specs):
+def _check_dask_specs(_, __, dask_specs):
     if dask_specs:
         # read from JSON config
         with open(dask_specs, "r") as src:
             return json.loads(src.read())
 
 
-def _get_timestamp(ctx, param, timestamp):
+def _get_timestamp(_, __, timestamp):
     """Convert timestamp to datetime object."""
-
-    def str_to_date(date_str):
-        """Convert string to datetime object."""
-        if "T" in date_str:
-            add_zulu = "Z" if date_str.endswith("Z") else ""
-            try:
-                return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%f" + add_zulu)
-            except ValueError:
-                return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S" + add_zulu)
-        else:
-            return datetime(*map(int, date_str.split("-")))
-
-    def date_to_str(date_obj, microseconds=True):
-        """Return string from datetime object in the format."""
-        return date_obj.strftime(
-            "%Y-%m-%dT%H:%M:%S.%fZ" if microseconds else "%Y-%m-%dT%H:%M:%SZ"
-        )
 
     if timestamp:
         try:
             # for a convertable timestamp like '2019-11-01T15:00:00'
             timestamp = str_to_date(timestamp)
         except ValueError:
-            # for a time range like '1d', '12h', '30m'
             try:
-                time_types = {
-                    "d": "days",
-                    "h": "hours",
-                    "m": "minutes",
-                    "s": "seconds",
-                }
-                for k, v in time_types.items():
-                    if timestamp.endswith(k):
-                        timestamp = datetime.utcnow() - timedelta(
-                            **{v: int(timestamp[:-1])}
-                        )
-                        break
-                else:
-                    raise ValueError()
+                timestamp = passed_time_to_timestamp(timestamp)
             except ValueError:
                 raise click.BadParameter(
                     """either provide a timestamp like '2019-11-01T15:00:00' or a time """
@@ -90,19 +68,19 @@ def _get_timestamp(ctx, param, timestamp):
         return date_to_str(timestamp)
 
 
-def _expand_str_list(ctx, param, str_list):
+def _expand_str_list(_, __, str_list):
     if str_list:
         str_list = str_list.split(",")
     return str_list
 
 
-def _validate_mapchete_files(ctx, param, mapchete_files):
+def _validate_mapchete_files(_, __, mapchete_files):
     if len(mapchete_files) == 0:
         raise click.MissingParameter("at least one mapchete file required")
     return mapchete_files
 
 
-def _validate_zoom(ctx, param, zoom):
+def _validate_zoom(_, __, zoom):
     if zoom:
         try:
             zoom_levels = list(map(int, zoom.split(",")))
@@ -119,7 +97,7 @@ def _validate_zoom(ctx, param, zoom):
             raise click.BadParameter(e)
 
 
-def _remote_versions_cb(ctx, param, value):
+def _remote_versions_cb(ctx, _, value):
     if value:
         click.echo(Client().remote_version)
         ctx.exit()
@@ -149,7 +127,7 @@ opt_bounds = click.option(
 opt_bounds_crs = click.option(
     "--bounds-crs",
     type=click.STRING,
-    help="CRS of --bounds. (default: process CRS)",
+    help="CRS of --bounds.  [default: process CRS]",
 )
 opt_area = click.option(
     "--area",
@@ -160,7 +138,7 @@ opt_area = click.option(
 opt_area_crs = click.option(
     "--area-crs",
     type=click.STRING,
-    help="CRS of --area (does not override CRS of vector file). (default: process CRS)",
+    help="CRS of --area (does not override CRS of vector file).  [default: process CRS]",
 )
 opt_point = click.option(
     "--point",
@@ -170,7 +148,7 @@ opt_point = click.option(
     help="Process tiles over single point location.",
 )
 opt_point_crs = click.option(
-    "--point-crs", type=click.STRING, help="CRS of --point. (default: process CRS)"
+    "--point-crs", type=click.STRING, help="CRS of --point.  [default: process CRS]"
 )
 opt_tile = click.option(
     "--tile", "-t", type=click.INT, nargs=3, help="Zoom, row, column of single tile."
@@ -222,12 +200,14 @@ opt_dask_max_submitted_tasks = click.option(
     type=click.INT,
     default=1000,
     help="Limit number of tasks being submitted to dask scheduler at once.",
+    show_default=True,
 )
 opt_dask_chunksize = click.option(
     "--dask-chunksize",
     type=click.INT,
     default=100,
     help="Number tasks being submitted per request to dask scheduler at once.",
+    show_default=True,
 )
 opt_dask_no_task_graph = click.option(
     "--dask-no-task-graph",
@@ -240,6 +220,7 @@ opt_since = click.option(
     callback=_get_timestamp,
     help="Filter jobs by timestamp since given time.",
     default="7d",
+    show_default=True,
 )
 opt_since_no_default = click.option(
     "--since",
@@ -271,7 +252,8 @@ opt_sort_by = click.option(
     "--sort-by",
     type=click.Choice(["started", "runtime", "status", "progress"]),
     default="status",
-    help="Sort jobs. (default: status)",
+    help="Sort jobs.",
+    show_default=True,
 )
 opt_mhub_user = click.option(
     "--user",
@@ -292,7 +274,6 @@ opt_make_zones = click.option(
     "--make-zones-on-zoom",
     "-zz",
     type=click.INT,
-    default=None,
     help="Split up job into smaller jobs using a specified zoom level grid.",
 )
 opt_full_zones = click.option(
@@ -305,21 +286,25 @@ opt_zones_wait_count = click.option(
     "-zwc",
     type=click.INT,
     default=MHUB_CLI_ZONES_WAIT_TILES_COUNT,
-    help=f"Threshold for at how many submitted zones the mhub cli should wait, only triggers when --make-zones-on-zoom is used. (default: {MHUB_CLI_ZONES_WAIT_TILES_COUNT})",
+    help="Threshold for at how many submitted zones the mhub cli should wait, only triggers when --make-zones-on-zoom is used.",
+    show_default=True,
 )
 opt_zones_wait_seconds = click.option(
     "--zones-wait-seconds",
     "-zws",
     type=click.INT,
     default=MHUB_CLI_ZONES_WAIT_TIME_SECONDS,
-    help=f"How long should the mhub cli wait until submitting next zone in seconds, only triggers when --make-zones-on-zoom is used. (default: {MHUB_CLI_ZONES_WAIT_TIME_SECONDS})",
+    help="How long should the mhub cli wait until submitting next zone in seconds, only triggers when --make-zones-on-zoom is used.",
+    show_default=True,
 )
 opt_zone = click.option(
     "--zone",
     type=click.INT,
     nargs=3,
-    default=None,
     help="Run on Zone defined by process pyramid grid.",
+)
+opt_use_old_image = click.option(
+    "--use-old-image", is_flag=True, help="Force to rerun Job on image from first run."
 )
 
 
@@ -331,14 +316,15 @@ opt_zone = click.option(
     type=click.STRING,
     nargs=1,
     default=f"{host_options['host_ip']}:{host_options['port']}",
-    help="""Address and port of mhub endpoint (default: """
-    f"""{host_options['host_ip']}:{host_options['port']}). (Or set MHUB_HOST env variable.)""",
+    help="Address and port of mhub endpoint",
+    show_default=True,
 )
 @click.option(
     "--timeout",
     type=click.INT,
     default=DEFAULT_TIMEOUT,
-    help=f"Time in seconds to wait for server response. (default: {DEFAULT_TIMEOUT})",
+    help="Time in seconds to wait for server response.",
+    show_default=True,
 )
 @click.option(
     "--remote-versions",
@@ -703,7 +689,7 @@ def jobs(
 
 @mhub.command(short_help="Show available processes.")
 @click.option(
-    "--process_name", "-n", type=click.STRING, help="Print docstring of process."
+    "--process-name", "-n", type=click.STRING, help="Print docstring of process."
 )
 @click.option("--docstrings", is_flag=True, help="Print docstrings of all processes.")
 @opt_debug
@@ -742,9 +728,7 @@ def processes(ctx, process_name=None, docstrings=False, debug=None, **kwargs):
 
 @mhub.command(short_help="Retry jobs.")
 @opt_job_ids
-@click.option(
-    "--use-old-image", is_flag=True, help="Force to rerun Job on image from first run."
-)
+@opt_use_old_image
 @opt_output_path
 @opt_status
 @opt_command
@@ -813,19 +797,144 @@ def retry(
         raise click.ClickException(e)
 
 
+@mhub.command(short_help="Abort stalled jobs.")
+@click.pass_context
+@click.option(
+    "--inactive-since",
+    type=click.STRING,
+    default="5h",
+    help="Time since jobs have been inactive.",
+    show_default=True,
+)
+@click.option(
+    "--pending-since",
+    type=click.STRING,
+    default="3d",
+    help="Time since jobs have been pending.",
+    show_default=True,
+)
+@click.option(
+    "--skip-dashboard-check", is_flag=True, help="Skip dashboard availability check."
+)
+@click.option("--retry", is_flag=True, help="Retry instead of cancel stalled jobs.")
+@opt_use_old_image
+@opt_force
+@opt_debug
+def clean(
+    ctx: click.Context,
+    inactive_since: str = "5h",
+    pending_since: str = "3d",
+    skip_dashboard_check: bool = False,
+    retry: bool = False,
+    use_old_image: bool = False,
+    force: bool = False,
+    debug: bool = False,
+):
+    """
+    Checks for probably stalled jobs and offers to cancel or retry them.
+
+    The check looks at three properties:\n
+    - jobs which are pending for too long\n
+    - jobs which are parsing|initializing|running but have been inactive for too long\n
+    - jobs which are running, have a scheduler but scheduler dashboard is not available\n
+    """
+    try:
+        client = Client(**ctx.obj)
+        job_ids = _stalled_jobs(
+            client=client,
+            inactive_since=inactive_since,
+            pending_since=pending_since,
+            check_inactive_dashboard=not skip_dashboard_check,
+        )
+        if job_ids:
+            click.echo(f"found {len(job_ids)} potentially stalled jobs:")
+            for job_id in job_ids:
+                click.echo(job_id)
+            if force or click.confirm(
+                f"Do you really want to cancel {len(job_ids)} job(s)?", abort=True
+            ):
+                for job_id in job_ids:
+                    cancelled_job = client.cancel_job(job_id)
+                    logger.debug(cancelled_job.to_dict())
+                    click.echo(f"job {job_id} {cancelled_job.status}")
+                    if retry:
+                        client.retry_job(job_id)
+                        job = Client(**ctx.obj).retry_job(
+                            job_id, use_old_image=use_old_image
+                        )
+                        click.echo(f"job {job.job_id} {job.status}")
+        else:
+            click.echo("no stalled jobs found")
+
+    except Exception as exc:  # pragma: no cover
+        if debug:
+            raise
+        raise click.ClickException(str(exc))
+
+
 # helper fucntions #
 ####################
-def _print_job_details(job, metadata_items=None, verbose=False):
-    def _pretty_runtime(elapsed):
-        minutes, seconds = divmod(elapsed, 60)
-        hours, minutes = divmod(minutes, 60)
-        if hours:  # pragma: no cover
-            return f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
-        elif minutes:  # pragma: no cover
-            return f"{int(minutes)}m {int(seconds)}s"
-        else:
-            return f"{round(seconds, 3)}s"
+def _stalled_jobs(
+    client: Client,
+    inactive_since: str = "5h",
+    pending_since: str = "3d",
+    check_inactive_dashboard: bool = True,
+) -> Set[str]:
+    stalled = set()
 
+    # jobs which have been pending for too long
+    for job in client.jobs(
+        status="pending", to_date=date_to_str(passed_time_to_timestamp(pending_since))
+    ).values():
+        logger.debug(
+            "job %s %s state since %s", job.job_id, job.status, job.last_updated
+        )
+        click.echo(
+            f"{job.job_id} {job.status} since {pretty_time_passed(job.last_updated)}"
+        )
+        stalled.add(job.job_id)
+
+    # jobs which have been inactive for too long
+    for status in ["parsing", "initializing", "running"]:
+        for job in client.jobs(
+            status=status,
+            to_date=date_to_str(passed_time_to_timestamp(inactive_since)),
+        ).values():
+            logger.debug(
+                "job %s %s but has been inactive since %s",
+                job.job_id,
+                job.status,
+                job.last_updated,
+            )
+            click.echo(
+                f"{job.job_id} {job.status} but has been inactive since {pretty_time_passed(job.last_updated)}"
+            )
+            stalled.add(job.job_id)
+
+    # running jobs with unavailable dashboard
+    if check_inactive_dashboard:
+        for job in client.jobs(status="running").values():
+            dashboard_link = job.properties.get("dask_dashboard_link")
+            # NOTE: jobs can be running without haveing a dashboard
+            if dashboard_link:
+                status_code = requests.get(dashboard_link).status_code
+                if status_code != 200:
+                    logger.debug(
+                        "job %s %s but dashboard %s returned status code %s",
+                        job.job_id,
+                        job.status,
+                        dashboard_link,
+                        status_code,
+                    )
+                    click.echo(
+                        f"{job.job_id} {job.status} but has inactive dashboard (status code {status_code}, job inactive since {pretty_time_passed(job.last_updated)})"
+                    )
+                    stalled.add(job.job_id)
+
+    return stalled
+
+
+def _print_job_details(job, metadata_items=None, verbose=False):
     color = "white"
     for group, statuss in JOB_STATUSES.items():  # pragma: no cover
         for status in statuss:
@@ -883,7 +992,7 @@ def _print_job_details(job, metadata_items=None, verbose=False):
 
         # runtime
         runtime = job.properties.get("runtime", "unknown")
-        click.echo(f"runtime: {_pretty_runtime(runtime) if runtime else None}")
+        click.echo(f"runtime: {pretty_time(runtime) if runtime else None}")
 
         # last received update
         last_update = job.properties.get("updated", "unknown")

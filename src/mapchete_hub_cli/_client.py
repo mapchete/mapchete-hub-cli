@@ -25,13 +25,18 @@ from mapchete_hub_cli.exceptions import (
     JobNotFound,
     JobRejected,
 )
+from mapchete_hub_cli.time import str_to_date
 
 logger = logging.getLogger(__name__)
 
-MHUB_CLI_ZONES_WAIT_TILES_COUNT = int(os.environ.get('MHUB_CLI_ZONES_WAIT_TILES_COUNT', '5'))
-MHUB_CLI_ZONES_WAIT_TIME_SECONDS = int(os.environ.get('MHUB_CLI_ZONES_WAIT_TIME_SECONDS', '10'))
+MHUB_CLI_ZONES_WAIT_TILES_COUNT = int(
+    os.environ.get("MHUB_CLI_ZONES_WAIT_TILES_COUNT", "5")
+)
+MHUB_CLI_ZONES_WAIT_TIME_SECONDS = int(
+    os.environ.get("MHUB_CLI_ZONES_WAIT_TIME_SECONDS", "10")
+)
 
-DEFAULT_TIMEOUT = int(os.environ.get('MHUB_CLI_DEFAULT_TIMEOUT', '5'))
+DEFAULT_TIMEOUT = int(os.environ.get("MHUB_CLI_DEFAULT_TIMEOUT", "5"))
 JOB_STATUSES = {
     "todo": ["pending"],
     "doing": ["parsing", "initializing", "retrying", "running"],
@@ -55,6 +60,7 @@ class Job:
         self.geometry = self.__geo_interface__ = self._dict["geometry"]
         self.bounds = self._dict.get("bounds")
         self.properties = self._dict["properties"]
+        self.last_updated = str_to_date(self.properties.get("updated"))
         self._client = _client
 
     def to_dict(self):
@@ -66,6 +72,9 @@ class Job:
     def __repr__(self):  # pragma: no cover
         """Print Job."""
         return f"Job(status_code={self.status_code}, status={self.status}, job_id={self.job_id}, updated={self.properties.get('updated')}"
+
+    def __hash__(self):
+        return hash(repr(self))
 
     def wait(self, wait_for_max=None, raise_exc=True):
         """Block until job has finished processing."""
@@ -228,10 +237,12 @@ class Client:
         # make sure correct command is provided
         if command not in COMMANDS:  # pragma: no cover
             raise ValueError(f"invalid command given: {command}")
-        
+
         logger.debug("send job to API")
         res = self.post(
-            f"processes/{command}/execution", data=json.dumps(job, default=str), timeout=self.timeout
+            f"processes/{command}/execution",
+            data=json.dumps(job, default=str),
+            timeout=self.timeout,
         )
 
         if res.status_code != 201:
@@ -375,15 +386,6 @@ class Client:
                 for job in res.json()["features"]
             }
         )
-
-    def jobs_statuss(self, output_path=None):
-        """Return jobs statuss."""
-        return {
-            job_id: job.status
-            for job_id, job in self.jobs(
-                timeout=self.timeout, output_path=output_path
-            ).items()
-        }
 
     def job_progress(self, job_id, interval=0.3, wait_for_max=None, raise_exc=True):
         """
