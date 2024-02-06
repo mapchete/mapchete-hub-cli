@@ -4,6 +4,7 @@ Convenience tools to communicate with mapchete Hub REST API.
 This module wraps around the requests module for real-life usage and FastAPI's TestClient()
 in order to be able to test mhub CLI.
 """
+from __future__ import annotations
 
 import datetime
 import json
@@ -12,12 +13,15 @@ import os
 import py_compile
 import time
 from collections import OrderedDict
+from dataclasses import dataclass
 from json.decoder import JSONDecodeError
+from typing import Any, Optional, Tuple, Union
 
 import oyaml as yaml
 import requests
 from requests.exceptions import HTTPError
 
+from mapchete_hub_cli.enums import Status
 from mapchete_hub_cli.exceptions import (
     JobAborting,
     JobCancelled,
@@ -45,36 +49,55 @@ JOB_STATUSES = {
 COMMANDS = ["execute"]
 
 
+@dataclass
 class Job:
     """Job metadata class."""
 
-    def __init__(
-        self, status_code=None, status=None, job_id=None, json=None, _client=None
-    ):
-        """Initialize."""
-        self.status_code = status_code
-        self.status = status
-        self.job_id = job_id
-        self.exists = True if status_code == 409 else False
-        self._dict = OrderedDict(json.items())
-        self.geometry = self.__geo_interface__ = self._dict["geometry"]
-        self.bounds = self._dict.get("bounds")
-        self.properties = self._dict["properties"]
-        self.last_updated = str_to_date(self.properties.get("updated"))
-        self._client = _client
+    status_code: int
+    status: Status
+    job_id: str
+    exists: bool
+    geoemtry: dict
+    __geo_interface__: dict
+    bounds: tuple
+    properties: dict
+    last_updated: datetime.datetime
+    client: Optional[Client]
+    _dict: dict
 
-    def to_dict(self):
+    @staticmethod
+    def from_response(res: requests.Response, client: Optional[Client] = None) -> Job:
+        return Job.from_dict(
+            response_dict=res.json(), status_code=res.status_code, client=client
+        )
+
+    @staticmethod
+    def from_dict(
+        response_dict: dict, status_code: int, client: Optional[Client] = None
+    ) -> Job:
+        return Job(
+            status_code=status_code,
+            status=Status[response_dict["properties"]["status"]],
+            job_id=response_dict["id"],
+            exists=True if status_code == 409 else False,
+            geoemtry=response_dict["geometry"],
+            __geo_interface__=response_dict["geometry"],
+            bounds=tuple(response_dict["bounds"]),
+            properties=response_dict["properties"],
+            last_updated=str_to_date(response_dict["properties"]["updated"]),
+            client=client,
+            _dict=response_dict,
+        )
+
+    def to_dict(self) -> dict:
         return self._dict
 
-    def to_json(self, indent=4):
-        return json.dumps(self._dict, indent=indent)
+    def to_json(self, indent=4) -> str:
+        return json.dumps(self.to_dict(), indent=indent)
 
     def __repr__(self):  # pragma: no cover
         """Print Job."""
         return f"Job(status_code={self.status_code}, status={self.status}, job_id={self.job_id}, updated={self.properties.get('updated')}"
-
-    def __hash__(self):
-        return hash(repr(self))
 
     def wait(self, wait_for_max=None, raise_exc=True):
         """Block until job has finished processing."""
@@ -82,7 +105,7 @@ class Job:
 
     def progress(self, wait_for_max=None, raise_exc=True, interval=0.3, smooth=False):
         """Yield job progress messages."""
-        progress_iter = self._client.job_progress(
+        progress_iter = self.client.job_progress(
             self.job_id,
             wait_for_max=wait_for_max,
             raise_exc=raise_exc,
@@ -139,7 +162,7 @@ class Client:
         response = self.get("", timeout=self.timeout).json()
         return response.get("versions", response.get("title", "").split(" ")[-1])
 
-    def _request(self, request_type, url, **kwargs):
+    def _request(self, request_type: str, url: str, **kwargs) -> requests.Response:
         _request_func = {
             "GET": self._client.get,
             "POST": self._client.post,
@@ -153,31 +176,31 @@ class Client:
             request_kwargs = self._get_kwargs(kwargs)
             logger.debug(f"{request_type}: {request_url}, {request_kwargs}")
             start = time.time()
-            res = _request_func[request_type](request_url, **request_kwargs)
+            response = _request_func[request_type](request_url, **request_kwargs)
             end = time.time()
-            logger.debug(f"response: {res}")
+            logger.debug(f"response: {response}")
             logger.debug(f"response took {round(end - start, 3)}s")
-            if res.status_code == 401:  # pragma: no cover
+            if response.status_code == 401:  # pragma: no cover
                 raise HTTPError("Authorization failure")
-            elif res.status_code >= 500:  # pragma: no cover
-                logger.error(f"response text: {res.text}")
-            return res
+            elif response.status_code >= 500:  # pragma: no cover
+                logger.error(f"response text: {response.text}")
+            return response
         except ConnectionError:  # pragma: no cover
             raise ConnectionError(f"no mhub server found at {self.host}")
 
-    def get(self, url, **kwargs):
+    def get(self, url: str, **kwargs) -> requests.Response:
         """Make a GET request to _test_client or host."""
         return self._request("GET", url, **kwargs)
 
-    def post(self, url, **kwargs):
+    def post(self, url: str, **kwargs) -> requests.Response:
         """Make a POST request to _test_client or host."""
         return self._request("POST", url, **kwargs)
 
-    def delete(self, url, **kwargs):
+    def delete(self, url: str, **kwargs) -> requests.Response:
         """Make a DELETE request to _test_client or host."""
         return self._request("DELETE", url, **kwargs)
 
-    def get_last_job_id(self):
+    def get_last_job_id(self) -> str:
         """
         Return ID of latest job if requested.
         """
@@ -192,7 +215,13 @@ class Client:
         ]
         return last_job.job_id
 
-    def start_job(self, command="execute", config=None, params=None, basedir=None):
+    def start_job(
+        self,
+        config: dict,
+        params: Optional[dict] = None,
+        command: str = "execute",
+        basedir: Optional[str] = None,
+    ) -> Job:
         """
         Start a job and return job status.
 
@@ -227,10 +256,9 @@ class Client:
         -------
         mapchete_hub.api.Job
         """
-        basedir = basedir or os.getcwd()
         job = OrderedDict(
             command=command,
-            config=load_mapchete_config(config, basedir),
+            config=load_mapchete_config(config, basedir=basedir),
             params=params or {},
         )
 
@@ -253,15 +281,9 @@ class Client:
         else:
             job_id = res.json()["id"]
             logger.debug(f"job {job_id} sent")
-            return Job(
-                status_code=res.status_code,
-                status=res.json()["properties"]["status"],
-                job_id=job_id,
-                json=res.json(),
-                _client=self,
-            )
+            return Job.from_response(res, client=self)
 
-    def cancel_job(self, job_id):
+    def cancel_job(self, job_id: str) -> Job:
         """
         Cancel existing job.
 
@@ -276,15 +298,9 @@ class Client:
         res = self.delete(f"jobs/{job_id}", timeout=self.timeout)
         if res.status_code == 404:
             raise JobNotFound(f"job {job_id} does not exist")
-        return Job(
-            status_code=res.status_code,
-            status=self.job_status(job_id),
-            job_id=job_id,
-            json=res.json(),
-            _client=self,
-        )
+        return Job.from_response(res, client=self)
 
-    def retry_job(self, job_id, use_old_image=False):
+    def retry_job(self, job_id: str, use_old_image: bool = False) -> Job:
         """
         Retry a job and its children and return job status.
 
@@ -318,7 +334,7 @@ class Client:
             params=params,
         )
 
-    def job(self, job_id, geojson=False, indent=4):
+    def job(self, job_id: str, geojson: bool = False, indent: int = 4) -> Job:
         """
         Return job metadata.
 
@@ -334,19 +350,9 @@ class Client:
         if res.status_code == 404:
             raise JobNotFound(f"job {job_id} does not exist")
         else:
-            return (
-                json.dumps(res.json(), indent=indent)
-                if geojson
-                else Job(
-                    status_code=res.status_code,
-                    status=res.json()["properties"]["status"],
-                    job_id=job_id,
-                    json=res.json(),
-                    _client=self,
-                )
-            )
+            return Job.from_response(res, client=self)
 
-    def job_status(self, job_id):
+    def job_status(self, job_id: str) -> Status:
         """
         Return job status.
 
@@ -360,7 +366,7 @@ class Client:
             job_id = self.get_last_job_id()
         return self.job(job_id).status
 
-    def jobs(self, geojson=False, indent=4, bounds=None, **kwargs):
+    def jobs(self, bounds=None, **kwargs) -> Tuple[Job, ...]:
         """Return jobs metadata."""
         res = self.get(
             "jobs",
@@ -372,20 +378,24 @@ class Client:
                 raise Exception(res.json())
             except JSONDecodeError:  # pragma: no cover
                 raise Exception(res.text)
-        return (
-            json.dumps(res.json(), indent=indent)
-            if geojson
-            else {
-                job["id"]: Job(
-                    status_code=200,
-                    status=job["properties"]["status"],
-                    job_id=job["id"],
-                    json=job,
-                    _client=self,
-                )
-                for job in res.json()["features"]
-            }
+        return tuple(
+            Job.from_dict(job, res.status_code, client=self)
+            for job in res.json()["features"]
         )
+
+    def jobs_geojson(self, indent=4, bounds=None, **kwargs) -> str:
+        """Return jobs metadata."""
+        res = self.get(
+            "jobs",
+            timeout=self.timeout,
+            params=dict(kwargs, bounds=",".join(map(str, bounds)) if bounds else None),
+        )
+        if res.status_code != 200:  # pragma: no cover
+            try:
+                raise Exception(res.json())
+            except JSONDecodeError:  # pragma: no cover
+                raise Exception(res.text)
+        return json.dumps(res.json(), indent=indent)
 
     def job_progress(self, job_id, interval=0.3, wait_for_max=None, raise_exc=True):
         """
@@ -467,7 +477,9 @@ class Client:
         return f"Client(host={self.host}, user={self._user}, password={self._password})"
 
 
-def load_mapchete_config(mapchete_config, basedir=None):
+def load_mapchete_config(
+    mapchete_config: Union[dict, str], basedir: Optional[str] = None
+) -> dict:
     """
     Return preprocessed mapchete config provided as dict or file.
 
@@ -487,11 +499,12 @@ def load_mapchete_config(mapchete_config, basedir=None):
     OrderedDict
         Preprocessed mapchete configuration.
     """
-    if isinstance(mapchete_config, (dict)):
-        conf = cleanup_datetime(mapchete_config)
+    basedir = basedir or os.getcwd()
+    if isinstance(mapchete_config, dict):
+        conf = cleanup_dict(mapchete_config)
     elif isinstance(mapchete_config, str):
         basedir = os.path.dirname(mapchete_config)
-        conf = cleanup_datetime(yaml.safe_load(open(mapchete_config, "r").read()))
+        conf = cleanup_dict(yaml.safe_load(open(mapchete_config, "r").read()))
     else:  # pragma: no cover
         raise TypeError(
             "mapchete config must either be a path to an existing file or a dict"
@@ -505,8 +518,8 @@ def load_mapchete_config(mapchete_config, basedir=None):
 
     if isinstance(process, str):
         # local python file
-        if conf.get("process").endswith(".py"):
-            custom_process_path = os.path.join(basedir, conf.get("process"))
+        if process.endswith(".py"):
+            custom_process_path = os.path.join(basedir, process)
             # check syntax
             py_compile.compile(custom_process_path, doraise=True)
             # assert file is not empty
@@ -518,13 +531,18 @@ def load_mapchete_config(mapchete_config, basedir=None):
     return conf
 
 
-def cleanup_datetime(d):
+def cleanup_dict(value: dict) -> OrderedDict:
     """Convert datetime objects in dictionary to strings."""
-    if isinstance(d, dict):
-        return OrderedDict([(k, cleanup_datetime(v)) for k, v in d.items()])
-    elif isinstance(d, (list, tuple)):
-        return [cleanup_datetime(ii) for ii in d]
-    elif isinstance(d, datetime.date):
-        return str(d)
+    return OrderedDict([(k, cleanup_datetime(v)) for k, v in value.items()])
+
+
+def cleanup_datetime(value: Any) -> Any:
+    """Convert datetime objects in dictionary to strings."""
+    if isinstance(value, dict):
+        return OrderedDict([(k, cleanup_datetime(v)) for k, v in value.items()])
+    elif isinstance(value, (list, tuple)):
+        return [cleanup_datetime(ii) for ii in value]
+    elif isinstance(value, datetime.date):
+        return str(value)
     else:
-        return d
+        return value
