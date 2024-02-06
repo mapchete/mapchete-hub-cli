@@ -1,6 +1,5 @@
 import json
 import logging
-from datetime import datetime, timedelta
 from itertools import chain
 from time import sleep
 
@@ -20,6 +19,13 @@ from mapchete_hub_cli import (
 )
 from mapchete_hub_cli.exceptions import JobFailed
 from mapchete_hub_cli.log import set_log_level
+from mapchete_hub_cli.time import (
+    date_to_str,
+    passed_time_to_timestamp,
+    pretty_time,
+    pretty_time_passed,
+    str_to_date,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,36 +34,17 @@ host_options = dict(host_ip="0.0.0.0", port=5000)
 
 # click callbacks #
 ###################
-def _set_debug_log_level(ctx, param, debug):
+def _set_debug_log_level(_, __, debug):
     if debug:  # pragma: no cover
         set_log_level(logging.DEBUG)
     return debug
 
 
-def _check_dask_specs(ctx, param, dask_specs):
+def _check_dask_specs(_, __, dask_specs):
     if dask_specs:
         # read from JSON config
         with open(dask_specs, "r") as src:
             return json.loads(src.read())
-
-
-def str_to_date(date_str):
-    """Convert string to datetime object."""
-    if "T" in date_str:
-        add_zulu = "Z" if date_str.endswith("Z") else ""
-        try:
-            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%f" + add_zulu)
-        except ValueError:
-            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S" + add_zulu)
-    else:
-        return datetime(*map(int, date_str.split("-")))
-
-
-def date_to_str(date_obj, microseconds=True):
-    """Return string from datetime object in the format."""
-    return date_obj.strftime(
-        "%Y-%m-%dT%H:%M:%S.%fZ" if microseconds else "%Y-%m-%dT%H:%M:%SZ"
-    )
 
 
 def _get_timestamp(_, __, timestamp):
@@ -68,21 +55,9 @@ def _get_timestamp(_, __, timestamp):
             # for a convertable timestamp like '2019-11-01T15:00:00'
             timestamp = str_to_date(timestamp)
         except ValueError:
-            # for a time range like '1d', '12h', '30m'
-            time_types = {
-                "w": "weeks",
-                "d": "days",
-                "h": "hours",
-                "m": "minutes",
-                "s": "seconds",
-            }
-            for k, v in time_types.items():
-                if timestamp.endswith(k):
-                    timestamp = datetime.utcnow() - timedelta(
-                        **{v: int(timestamp[:-1])}
-                    )
-                    break
-            else:
+            try:
+                timestamp = passed_time_to_timestamp(timestamp)
+            except ValueError:
                 raise click.BadParameter(
                     """either provide a timestamp like '2019-11-01T15:00:00' or a time """
                     """range in the format '1d', '12h', '30m', etc."""
@@ -90,19 +65,19 @@ def _get_timestamp(_, __, timestamp):
         return date_to_str(timestamp)
 
 
-def _expand_str_list(ctx, param, str_list):
+def _expand_str_list(_, __, str_list):
     if str_list:
         str_list = str_list.split(",")
     return str_list
 
 
-def _validate_mapchete_files(ctx, param, mapchete_files):
+def _validate_mapchete_files(_, __, mapchete_files):
     if len(mapchete_files) == 0:
         raise click.MissingParameter("at least one mapchete file required")
     return mapchete_files
 
 
-def _validate_zoom(ctx, param, zoom):
+def _validate_zoom(_, __, zoom):
     if zoom:
         try:
             zoom_levels = list(map(int, zoom.split(",")))
@@ -119,7 +94,7 @@ def _validate_zoom(ctx, param, zoom):
             raise click.BadParameter(e)
 
 
-def _remote_versions_cb(ctx, param, value):
+def _remote_versions_cb(ctx, _, value):
     if value:
         click.echo(Client().remote_version)
         ctx.exit()
@@ -255,14 +230,6 @@ opt_until = click.option(
     type=click.STRING,
     callback=_get_timestamp,
     help="Filter jobs by timestamp until given time.",
-)
-opt_until_1d_ago = click.option(
-    "--until",
-    type=click.STRING,
-    callback=_get_timestamp,
-    default="1d",
-    help="Filter jobs by timestamp until given time.",
-    show_default=True,
 )
 opt_job_ids = click.option(
     "--job-ids",
@@ -828,29 +795,46 @@ def retry(
 
 @mhub.command(short_help="Abort stalled jobs.")
 @click.pass_context
-@opt_until_1d_ago
+@click.option(
+    "--inactive-since",
+    type=click.STRING,
+    default="5h",
+    help="Time since jobs have been inactive.",
+    show_default=True,
+)
+@click.option(
+    "--pending-since",
+    type=click.STRING,
+    default="3d",
+    help="Time since jobs have been pending.",
+    show_default=True,
+)
 @opt_force
 @opt_debug
 def clean(
     ctx,
-    until=None,
+    inactive_since=None,
+    pending_since=None,
     force=False,
     debug=False,
 ):
     try:
         client = Client(**ctx.obj)
-        jobs = client.jobs(status=["parsing", "initializing", "running"], to_date=until)
+        jobs = _stalled_jobs(
+            client=client,
+            inactive_since=inactive_since,
+            pending_since=pending_since,
+            check_inactive_dashboard=True,
+        )
         click.echo(f"found {len(jobs)} stalled jobs")
         if jobs:
-            for job_id, job in jobs.items():
-                click.echo(
-                    f"{job_id}: {job.status}, last update on {job.properties.get('updated')}"
-                )
+            for job in jobs:
+                click.echo(job.job_id)
             if force or click.confirm(
                 f"Do you really want to cancel {len(jobs)} job(s)?", abort=True
             ):
-                for job_id in jobs:
-                    job = client.cancel_job(job_id)
+                for job in jobs:
+                    job = client.cancel_job(job.job_id)
                     logger.debug(job.to_dict())
                     click.echo(f"job {job.status}")
 
@@ -862,17 +846,60 @@ def clean(
 
 # helper fucntions #
 ####################
-def _print_job_details(job, metadata_items=None, verbose=False):
-    def _pretty_runtime(elapsed):
-        minutes, seconds = divmod(elapsed, 60)
-        hours, minutes = divmod(minutes, 60)
-        if hours:  # pragma: no cover
-            return f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
-        elif minutes:  # pragma: no cover
-            return f"{int(minutes)}m {int(seconds)}s"
-        else:
-            return f"{round(seconds, 3)}s"
+def _stalled_jobs(
+    client: Client,
+    inactive_since: str = "5h",
+    pending_since: str = "3d",
+    check_inactive_dashboard: bool = True,
+):
+    stalled = set()
 
+    # jobs which have been pending for too long
+    for job in client.jobs(
+        status="pending", to_date=date_to_str(passed_time_to_timestamp(pending_since))
+    ).values():
+        logger.debug(
+            "job %s is in pending state since %s", job.job_id, job.last_updated
+        )
+        click.echo(f"{job.job_id} pending since {pretty_time_passed(job.last_updated)}")
+        stalled.add(job)
+
+    # jobs which have been inactive for too long
+    for job in client.jobs(
+        status=["parsing", "initializing", "running"],
+        to_date=date_to_str(passed_time_to_timestamp(inactive_since)),
+    ).values():
+        logger.debug(
+            "job %s runs but has been inactive since %s", job.job_id, job.last_updated
+        )
+        click.echo(
+            f"{job.job_id} runs but has been inactive since {pretty_time_passed(job.last_updated)}"
+        )
+        stalled.add(job)
+
+    # running jobs with unavailable dashboard
+    if check_inactive_dashboard:
+        for job in client.jobs(status="running").values():
+            dashboard_link = job.properties.get("dask_dashboard_link")
+            # NOTE: jobs can be running without haveing a dashboard
+            if dashboard_link:
+                status_code = client.get(dashboard_link).status_code
+                if status_code != 200:
+                    logger.debug(
+                        "job %s dashboard %s returned status code %s",
+                        job.job_id,
+                        dashboard_link,
+                        status_code,
+                    )
+                    click.echo(
+                        f"{job.job_id} has inactive dashboard (status code {status_code})"
+                    )
+                    stalled.add(job)
+
+    return stalled
+
+
+def _print_job_details(job, metadata_items=None, verbose=False):
     color = "white"
     for group, statuss in JOB_STATUSES.items():  # pragma: no cover
         for status in statuss:
@@ -930,7 +957,7 @@ def _print_job_details(job, metadata_items=None, verbose=False):
 
         # runtime
         runtime = job.properties.get("runtime", "unknown")
-        click.echo(f"runtime: {_pretty_runtime(runtime) if runtime else None}")
+        click.echo(f"runtime: {pretty_time(runtime) if runtime else None}")
 
         # last received update
         last_update = job.properties.get("updated", "unknown")
