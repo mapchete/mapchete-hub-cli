@@ -303,6 +303,9 @@ opt_zone = click.option(
     nargs=3,
     help="Run on Zone defined by process pyramid grid.",
 )
+opt_use_old_image = click.option(
+    "--use-old-image", is_flag=True, help="Force to rerun Job on image from first run."
+)
 
 
 @click.version_option(version=__version__, message="%(version)s")
@@ -725,9 +728,7 @@ def processes(ctx, process_name=None, docstrings=False, debug=None, **kwargs):
 
 @mhub.command(short_help="Retry jobs.")
 @opt_job_ids
-@click.option(
-    "--use-old-image", is_flag=True, help="Force to rerun Job on image from first run."
-)
+@opt_use_old_image
 @opt_output_path
 @opt_status
 @opt_command
@@ -815,6 +816,8 @@ def retry(
 @click.option(
     "--skip-dashboard-check", is_flag=True, help="Skip dashboard availability check."
 )
+@click.option("--retry", is_flag=True, help="Retry instead of cancel stalled jobs.")
+@opt_use_old_image
 @opt_force
 @opt_debug
 def clean(
@@ -822,11 +825,13 @@ def clean(
     inactive_since: str = "5h",
     pending_since: str = "3d",
     skip_dashboard_check: bool = False,
+    retry: bool = False,
+    use_old_image: bool = False,
     force: bool = False,
     debug: bool = False,
 ):
     """
-    Checks for probably stalled jobs and offers to cancel them.
+    Checks for probably stalled jobs and offers to cancel or retry them.
 
     The check looks at three properties:\n
     - jobs which are pending for too long\n
@@ -851,7 +856,13 @@ def clean(
                 for job_id in job_ids:
                     cancelled_job = client.cancel_job(job_id)
                     logger.debug(cancelled_job.to_dict())
-                    click.echo(f"job {cancelled_job.status}")
+                    click.echo(f"job {job_id} {cancelled_job.status}")
+                    if retry:
+                        client.retry_job(job_id)
+                        job = Client(**ctx.obj).retry_job(
+                            job_id, use_old_image=use_old_image
+                        )
+                        click.echo(f"job {job.job_id} {job.status}")
         else:
             click.echo("no stalled jobs found")
 
