@@ -6,6 +6,7 @@ from typing import Set
 
 import click
 import oyaml as yaml
+import requests
 from tqdm import tqdm
 
 from mapchete_hub_cli import (
@@ -841,7 +842,7 @@ def clean(
             check_inactive_dashboard=not skip_dashboard_check,
         )
         if job_ids:
-            click.echo(f"found {len(job_ids)} stalled jobs:")
+            click.echo(f"found {len(job_ids)} potentially stalled jobs:")
             for job_id in job_ids:
                 click.echo(job_id)
             if force or click.confirm(
@@ -883,20 +884,21 @@ def _stalled_jobs(
         stalled.add(job.job_id)
 
     # jobs which have been inactive for too long
-    for job in client.jobs(
-        status=["parsing", "initializing", "running"],
-        to_date=date_to_str(passed_time_to_timestamp(inactive_since)),
-    ).values():
-        logger.debug(
-            "job %s %s but has been inactive since %s",
-            job.job_id,
-            job.status,
-            job.last_updated,
-        )
-        click.echo(
-            f"{job.job_id} {job.status} but has been inactive since {pretty_time_passed(job.last_updated)}"
-        )
-        stalled.add(job.job_id)
+    for status in ["parsing", "initializing", "running"]:
+        for job in client.jobs(
+            status=status,
+            to_date=date_to_str(passed_time_to_timestamp(inactive_since)),
+        ).values():
+            logger.debug(
+                "job %s %s but has been inactive since %s",
+                job.job_id,
+                job.status,
+                job.last_updated,
+            )
+            click.echo(
+                f"{job.job_id} {job.status} but has been inactive since {pretty_time_passed(job.last_updated)}"
+            )
+            stalled.add(job.job_id)
 
     # running jobs with unavailable dashboard
     if check_inactive_dashboard:
@@ -904,7 +906,7 @@ def _stalled_jobs(
             dashboard_link = job.properties.get("dask_dashboard_link")
             # NOTE: jobs can be running without haveing a dashboard
             if dashboard_link:
-                status_code = client.get(dashboard_link).status_code
+                status_code = requests.get(dashboard_link).status_code
                 if status_code != 200:
                     logger.debug(
                         "job %s %s but dashboard %s returned status code %s",

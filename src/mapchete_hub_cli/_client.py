@@ -387,15 +387,6 @@ class Client:
             }
         )
 
-    def jobs_statuss(self, output_path=None):
-        """Return jobs statuss."""
-        return {
-            job_id: job.status
-            for job_id, job in self.jobs(
-                timeout=self.timeout, output_path=output_path
-            ).items()
-        }
-
     def job_progress(self, job_id, interval=0.3, wait_for_max=None, raise_exc=True):
         """
         Yield job progress information.
