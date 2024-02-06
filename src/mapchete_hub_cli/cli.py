@@ -2,6 +2,7 @@ import json
 import logging
 from itertools import chain
 from time import sleep
+from typing import Set
 
 import click
 import oyaml as yaml
@@ -14,6 +15,7 @@ from mapchete_hub_cli import (
     MHUB_CLI_ZONES_WAIT_TILES_COUNT,
     MHUB_CLI_ZONES_WAIT_TIME_SECONDS,
     Client,
+    Job,
     __version__,
     load_mapchete_config,
 )
@@ -809,39 +811,53 @@ def retry(
     help="Time since jobs have been pending.",
     show_default=True,
 )
+@click.option(
+    "--skip-dashboard-check", is_flag=True, help="Skip dashboard availability check."
+)
 @opt_force
 @opt_debug
 def clean(
-    ctx,
-    inactive_since=None,
-    pending_since=None,
-    force=False,
-    debug=False,
+    ctx: click.Context,
+    inactive_since: str = "5h",
+    pending_since: str = "3d",
+    skip_dashboard_check: bool = False,
+    force: bool = False,
+    debug: bool = False,
 ):
+    """
+    Checks for probably stalled jobs and offers to cancel them.
+
+    The check looks at three properties:\n
+    - jobs which are pending for too long\n
+    - jobs which are parsing|initializing|running but have been inactive for too long\n
+    - jobs which are running, have a scheduler but scheduler dashboard is not available\n
+    """
     try:
         client = Client(**ctx.obj)
-        jobs = _stalled_jobs(
+        job_ids = _stalled_jobs(
             client=client,
             inactive_since=inactive_since,
             pending_since=pending_since,
-            check_inactive_dashboard=True,
+            check_inactive_dashboard=not skip_dashboard_check,
         )
-        click.echo(f"found {len(jobs)} stalled jobs")
-        if jobs:
-            for job in jobs:
-                click.echo(job.job_id)
+        if job_ids:
+            click.echo(f"found {len(job_ids)} stalled jobs:")
+            for job_id in job_ids:
+                click.echo(job_id)
             if force or click.confirm(
-                f"Do you really want to cancel {len(jobs)} job(s)?", abort=True
+                f"Do you really want to cancel {len(job_ids)} job(s)?", abort=True
             ):
-                for job in jobs:
-                    job = client.cancel_job(job.job_id)
-                    logger.debug(job.to_dict())
-                    click.echo(f"job {job.status}")
+                for job_id in job_ids:
+                    cancelled_job = client.cancel_job(job_id)
+                    logger.debug(cancelled_job.to_dict())
+                    click.echo(f"job {cancelled_job.status}")
+        else:
+            click.echo("no stalled jobs found")
 
-    except Exception as e:  # pragma: no cover
+    except Exception as exc:  # pragma: no cover
         if debug:
             raise
-        raise click.ClickException(e)
+        raise click.ClickException(str(exc))
 
 
 # helper fucntions #
@@ -851,7 +867,7 @@ def _stalled_jobs(
     inactive_since: str = "5h",
     pending_since: str = "3d",
     check_inactive_dashboard: bool = True,
-):
+) -> Set[str]:
     stalled = set()
 
     # jobs which have been pending for too long
@@ -859,10 +875,12 @@ def _stalled_jobs(
         status="pending", to_date=date_to_str(passed_time_to_timestamp(pending_since))
     ).values():
         logger.debug(
-            "job %s is in pending state since %s", job.job_id, job.last_updated
+            "job %s %s state since %s", job.job_id, job.status, job.last_updated
         )
-        click.echo(f"{job.job_id} pending since {pretty_time_passed(job.last_updated)}")
-        stalled.add(job)
+        click.echo(
+            f"{job.job_id} {job.status} since {pretty_time_passed(job.last_updated)}"
+        )
+        stalled.add(job.job_id)
 
     # jobs which have been inactive for too long
     for job in client.jobs(
@@ -870,12 +888,15 @@ def _stalled_jobs(
         to_date=date_to_str(passed_time_to_timestamp(inactive_since)),
     ).values():
         logger.debug(
-            "job %s runs but has been inactive since %s", job.job_id, job.last_updated
+            "job %s %s but has been inactive since %s",
+            job.job_id,
+            job.status,
+            job.last_updated,
         )
         click.echo(
-            f"{job.job_id} runs but has been inactive since {pretty_time_passed(job.last_updated)}"
+            f"{job.job_id} {job.status} but has been inactive since {pretty_time_passed(job.last_updated)}"
         )
-        stalled.add(job)
+        stalled.add(job.job_id)
 
     # running jobs with unavailable dashboard
     if check_inactive_dashboard:
@@ -886,15 +907,16 @@ def _stalled_jobs(
                 status_code = client.get(dashboard_link).status_code
                 if status_code != 200:
                     logger.debug(
-                        "job %s dashboard %s returned status code %s",
+                        "job %s %s but dashboard %s returned status code %s",
                         job.job_id,
+                        job.status,
                         dashboard_link,
                         status_code,
                     )
                     click.echo(
-                        f"{job.job_id} has inactive dashboard (status code {status_code})"
+                        f"{job.job_id} {job.status} but has inactive dashboard (status code {status_code}, job inactive since {pretty_time_passed(job.last_updated)})"
                     )
-                    stalled.add(job)
+                    stalled.add(job.job_id)
 
     return stalled
 

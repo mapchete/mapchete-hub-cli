@@ -74,7 +74,7 @@ class Job:
         return f"Job(status_code={self.status_code}, status={self.status}, job_id={self.job_id}, updated={self.properties.get('updated')}"
 
     def __hash__(self):
-        return hash(self.job_id)
+        return hash(repr(self))
 
     def wait(self, wait_for_max=None, raise_exc=True):
         """Block until job has finished processing."""
