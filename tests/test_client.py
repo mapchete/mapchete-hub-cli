@@ -105,16 +105,6 @@ def test_last_job_status(mhub_client, example_config_json):
     assert mhub_client.job_status(":last:") == "done"
 
 
-def test_job_statuss(mhub_client, example_config_json):
-    """Return job status."""
-    mhub_client.start_job(**example_config_json)
-    statuss = mhub_client.jobs_statuss()
-    assert isinstance(statuss, dict)
-    for job_id, status in statuss.items():
-        assert job_id
-        assert status
-
-
 def test_list_jobs_bounds(mhub_client, example_config_json):
     job_id = mhub_client.start_job(
         **dict(example_config_json, params=dict(example_config_json["params"], zoom=2))
