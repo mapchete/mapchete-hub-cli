@@ -16,7 +16,7 @@ def str_to_date(date_str: str) -> datetime:
             raise ValueError(f"cannot parse {date_str} to timestamp")
         # for e.g. 2024-01-01
         year, month, day = values
-        return datetime(year, month, day)
+        return datetime(int(year), int(month), int(day))
 
 
 def date_to_str(date_obj: Union[str, datetime], microseconds=True) -> str:
