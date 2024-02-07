@@ -1,4 +1,5 @@
 click
 oyaml
+pydantic
 requests
 tqdm

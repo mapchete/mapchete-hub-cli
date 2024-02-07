@@ -25,6 +25,7 @@ classifiers = [
 dependencies = [
     "click",
     "oyaml",
+    "pydantic",
     "requests",
     "tqdm",
 ]
