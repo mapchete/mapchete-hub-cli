@@ -62,11 +62,12 @@ def jobs(
     kwargs.update(from_date=kwargs.pop("since"), to_date=kwargs.pop("until"))
     try:
         client = Client(**ctx.obj)
+        jobs = client.jobs(**kwargs)
         if geojson:
-            click.echo(client.jobs(geojson=True, **kwargs))
+            click.echo(jobs.to_json())
         else:
             # sort by status and then by timestamp
-            jobs = _sort_jobs(client.jobs(**kwargs), sort_by=sort_by)
+            jobs = _sort_jobs(jobs, sort_by=sort_by)
             logger.debug(jobs)
             if verbose:
                 click.echo(f"{len(jobs)} jobs found. \n")

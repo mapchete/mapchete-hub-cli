@@ -2,7 +2,7 @@ import click
 from tqdm import tqdm
 
 from mapchete_hub_cli.cli import options
-from mapchete_hub_cli.client import Client
+from mapchete_hub_cli.client import Client, Job
 from mapchete_hub_cli.exceptions import JobFailed
 
 
@@ -35,30 +35,29 @@ def progress(
         client = Client(**ctx.obj)
         job = client.job(job_id)
         click.echo(f"job {job.job_id} {job.status}")
-        show_progress(client, job_id, disable=debug, interval=interval)
+        show_progress_bar(job, disable=debug, interval=interval)
     except Exception as e:  # pragma: no cover
         if debug:
             raise
         raise click.ClickException(e)
 
 
-def show_progress(client, job_id, disable=False, interval=0.3):
+def show_progress_bar(job: Job, disable: bool = False, interval: float = 0.3):
     try:
-        progress_iter = client.job(job_id).progress(smooth=True, interval=interval)
+        progress_iter = job.yield_progress(smooth=True, interval=interval)
         click.echo("wait for job progress...")
-        i = next(progress_iter)
-        last_progress = i["current_progress"]
+        progress = next(progress_iter)
+        last_progress = progress.current
         with tqdm(
-            total=i["total_progress"],
+            total=progress.total,
             initial=last_progress,
             disable=disable,
             unit="task",
         ) as pbar:
-            for i in progress_iter:
-                current_progress = i["current_progress"]
-                pbar.update(current_progress - last_progress)
-                last_progress = current_progress
-        click.echo(f"job {i['status']}")
+            for progress in progress_iter:
+                pbar.update(progress.current - last_progress)
+                last_progress = progress.current
+        click.echo(f"job {job.status}")
     except JobFailed as e:  # pragma: no cover
-        click.echo(f"Job {job_id} failed: {e}")
+        click.echo(f"Job {job.job_id} failed: {e}")
         return

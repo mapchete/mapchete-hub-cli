@@ -1,9 +1,10 @@
 import logging
+from typing import Generator, List, Union
 
 import click
 
 from mapchete_hub_cli.cli import options
-from mapchete_hub_cli.client import JOB_STATUSES, Client
+from mapchete_hub_cli.client import JOB_STATUSES, Client, Job, Jobs
 
 logger = logging.getLogger(__name__)
 
@@ -36,26 +37,19 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
                 )
             jobs = client.jobs(**kwargs)
 
-        def _yield_revokable_jobs(jobs):
-            for j in jobs:
-                if j.status in JOB_STATUSES["done"]:  # pragma: no cover
-                    click.echo(f"Job {j.job_id} already in status {j.status}.")
-                else:
-                    yield j.job_id
+        jobs = list(yield_revokable_jobs(jobs))
 
-        job_ids = list(_yield_revokable_jobs(jobs))
-
-        if not job_ids:  # pragma: no cover
+        if not jobs:  # pragma: no cover
             click.echo("No revokable jobs found.")
             return
 
-        for job_id in job_ids:
-            click.echo(job_id)
+        for job in jobs:
+            click.echo(job.job_id)
         if force or click.confirm(
-            f"Do you really want to cancel {len(job_ids)} job(s)?", abort=True
+            f"Do you really want to cancel {len(jobs)} job(s)?", abort=True
         ):
-            for job_id in job_ids:
-                job = client.cancel_job(job_id)
+            for job in jobs:
+                job.cancel()
                 logger.debug(job.to_dict())
                 click.echo(f"job {job.status}")
 
@@ -63,3 +57,11 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
         if debug:
             raise
         raise click.ClickException(e)
+
+
+def yield_revokable_jobs(jobs: Union[Jobs, List[Job]]) -> Generator[Job, None, None]:
+    for job in jobs:
+        if job.status in JOB_STATUSES["done"]:  # pragma: no cover
+            click.echo(f"Job {job.job_id} already in status {job.status}.")
+        else:
+            yield job

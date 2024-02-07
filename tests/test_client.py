@@ -7,7 +7,7 @@ import pytest
 from shapely.geometry import shape
 
 from mapchete_hub_cli import exceptions
-from mapchete_hub_cli.client import JOB_STATUSES, Status
+from mapchete_hub_cli.client import Job, Status
 
 
 def test_get_root(mhub_client):
@@ -232,3 +232,18 @@ def test_errors(mhub_client, example_config_json):
         mhub_client.job("foo")
     with pytest.raises(exceptions.JobNotFound):
         mhub_client.cancel_job("foo")
+
+
+def test_jobs(mhub_client, example_config_json):
+    job_id = mhub_client.start_job(
+        **dict(
+            example_config_json,
+            params=dict(example_config_json["params"], zoom=2, job_name="foo"),
+        )
+    ).job_id
+
+    job1 = mhub_client.job(job_id)
+    job2 = mhub_client.job(job_id)
+
+    # make sure jobs are considered the same
+    assert len(set([job1, job2])) == 1

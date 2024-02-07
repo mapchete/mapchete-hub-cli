@@ -3,7 +3,7 @@ from time import sleep
 import click
 
 from mapchete_hub_cli.cli import options
-from mapchete_hub_cli.cli.progress import show_progress
+from mapchete_hub_cli.cli.progress import show_progress_bar
 from mapchete_hub_cli.client import Client
 from mapchete_hub_cli.parser import load_mapchete_config
 
@@ -112,12 +112,11 @@ def execute(
                 )
                 if verbose:  # pragma: no cover
                     click.echo(f"job {job.job_id} {job.status}")
-                    job = client.job(job.job_id)
                     if job.properties.get("dask_dashboard_link"):
                         click.echo(
                             f"dask dashboard: {job.properties.get('dask_dashboard_link')}"
                         )
-                    show_progress(client, job.job_id, disable=debug)
+                    show_progress_bar(job, disable=debug)
                 else:
                     click.echo(job.job_id)
         except Exception as e:  # pragma: no cover

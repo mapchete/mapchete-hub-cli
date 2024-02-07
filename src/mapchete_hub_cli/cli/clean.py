@@ -5,7 +5,7 @@ import click
 import requests
 
 from mapchete_hub_cli.cli import options
-from mapchete_hub_cli.client import Client
+from mapchete_hub_cli.client import Client, Job
 from mapchete_hub_cli.enums import Status
 from mapchete_hub_cli.time import (
     date_to_str,
@@ -59,27 +59,31 @@ def clean(
     """
     try:
         client = Client(**ctx.obj)
-        job_ids = _stalled_jobs(
+        jobs = stalled_jobs(
             client=client,
             inactive_since=inactive_since,
             pending_since=pending_since,
             check_inactive_dashboard=not skip_dashboard_check,
         )
-        if job_ids:
-            click.echo(f"found {len(job_ids)} potentially stalled jobs:")
-            for job_id in job_ids:
-                click.echo(job_id)
+        if jobs:
+            click.echo(f"found {len(jobs)} potentially stalled jobs:")
+            for job in jobs:
+                click.echo(job.job_id)
             if force or click.confirm(
-                f"Do you really want to cancel {len(job_ids)} job(s)?", abort=True
+                f"Do you really want to cancel {'and retry ' if retry else ''}{len(jobs)} job(s)?",
+                abort=True,
             ):
-                for job_id in job_ids:
-                    cancelled_job = client.cancel_job(job_id)
-                    logger.debug(cancelled_job.to_dict())
-                    click.echo(f"job {job_id} {cancelled_job.status}")
+                for job in jobs:
+                    job.cancel()
+                    logger.debug(job.to_dict())
                     if retry:
-                        client.retry_job(job_id)
-                        job = client.retry_job(job_id, use_old_image=use_old_image)
-                        click.echo(f"job {job.job_id} {job.status}")
+                        retried_job = job.retry(use_old_image=use_old_image)
+                        click.echo(
+                            f"job {job.job_id} {job.status} and retried as {retried_job.job_id} ({retried_job.status})"
+                        )
+                    else:
+                        click.echo(f"job {job} {job.status}")
+
         else:
             click.echo("No stalled jobs found.")
 
@@ -89,12 +93,12 @@ def clean(
         raise click.ClickException(str(exc))
 
 
-def _stalled_jobs(
+def stalled_jobs(
     client: Client,
     inactive_since: str = "5h",
     pending_since: str = "3d",
     check_inactive_dashboard: bool = True,
-) -> Set[str]:
+) -> Set[Job]:
     stalled = set()
 
     # jobs which have been pending for too long
@@ -108,7 +112,7 @@ def _stalled_jobs(
         click.echo(
             f"{job.job_id} {job.status} since {pretty_time_passed(job.last_updated)}"
         )
-        stalled.add(job.job_id)
+        stalled.add(job)
 
     # jobs which have been inactive for too long
     for status in [Status.parsing, Status.initializing, Status.running]:
@@ -125,7 +129,7 @@ def _stalled_jobs(
             click.echo(
                 f"{job.job_id} {job.status} but has been inactive since {pretty_time_passed(job.last_updated)}"
             )
-            stalled.add(job.job_id)
+            stalled.add(job)
 
     # running jobs with unavailable dashboard
     if check_inactive_dashboard:
@@ -145,6 +149,6 @@ def _stalled_jobs(
                     click.echo(
                         f"{job.job_id} {job.status} but has inactive dashboard (status code {status_code}, job inactive since {pretty_time_passed(job.last_updated)})"
                     )
-                    stalled.add(job.job_id)
+                    stalled.add(job)
 
     return stalled

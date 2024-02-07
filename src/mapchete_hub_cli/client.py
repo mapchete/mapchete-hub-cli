@@ -28,6 +28,7 @@ from mapchete_hub_cli.exceptions import (
 )
 from mapchete_hub_cli.parser import load_mapchete_config
 from mapchete_hub_cli.time import date_to_str, passed_time_to_timestamp, str_to_date
+from mapchete_hub_cli.types import Progress
 
 logger = logging.getLogger(__name__)
 
@@ -54,25 +55,30 @@ class Job:
     status: Status
     job_id: str
     geoemtry: dict
-    __geo_interface__: dict
     bounds: tuple
     properties: dict
     last_updated: datetime.datetime
-    client: Optional[Client]
+    client: Client
+    progress: Progress
     _dict: dict
+    __geo_interface__: dict
 
     @staticmethod
-    def from_dict(response_dict: dict, client: Optional[Client] = None) -> Job:
+    def from_dict(response_dict: dict, client: Client) -> Job:
         return Job(
             status=Status[response_dict["properties"]["status"]],
             job_id=response_dict["id"],
             geoemtry=response_dict["geometry"],
-            __geo_interface__=response_dict["geometry"],
             bounds=tuple(response_dict["bounds"]),
             properties=response_dict["properties"],
             last_updated=str_to_date(response_dict["properties"]["updated"]),
             client=client,
+            progress=Progress(
+                current=response_dict["properties"]["current_progress"] or 0,
+                total=response_dict["properties"]["total_progress"],
+            ),
             _dict=response_dict,
+            __geo_interface__=response_dict["geometry"],
         )
 
     def to_dict(self) -> dict:
@@ -83,34 +89,93 @@ class Job:
 
     def __repr__(self):  # pragma: no cover
         """Print Job."""
-        return f"Job(status={self.status}, job_id={self.job_id}, updated={self.last_updated}"
+        return f"Job(status={self.status}, job_id={self.job_id}, updated={self.last_updated})"
+
+    def __hash__(self):
+        return hash(self.job_id)
+
+    def _update(self, job: Job):
+        self.status = job.status
+        self._dict = job._dict
+        self.properties = job.properties
+        self.last_updated = job.last_updated
+        self.progress = job.progress
+
+    def update(self):
+        self._update(self.client.job(self.job_id))
+
+    def cancel(self):
+        self._update(self.client.cancel_job(self.job_id))
+
+    def retry(self, use_old_image: bool = False) -> Job:
+        return self.client.retry_job(self.job_id, use_old_image=use_old_image)
 
     def wait(self, wait_for_max=None, raise_exc=True):
         """Block until job has finished processing."""
-        list(self.progress(wait_for_max=wait_for_max, raise_exc=raise_exc))
+        list(self.yield_progress(wait_for_max=wait_for_max, raise_exc=raise_exc))
 
-    def progress(self, wait_for_max=None, raise_exc=True, interval=0.3, smooth=False):
+    def yield_progress(
+        self,
+        wait_for_max: Optional[float] = None,
+        raise_exc: bool = True,
+        interval: float = 0.3,
+        smooth: bool = False,
+    ) -> Generator[Progress, None, None]:
         """Yield job progress messages."""
-        progress_iter = self.client.job_progress(
-            self.job_id,
-            wait_for_max=wait_for_max,
-            raise_exc=raise_exc,
-            interval=interval,
-        )
-        if smooth:
-            i = next(progress_iter)
-            last_progress = i["current_progress"]
-            yield i
-            for i in progress_iter:
-                current_progress = i["current_progress"]
-                jump = current_progress - last_progress
-                for j in range(jump):
-                    time.sleep(interval / jump)
-                    yield dict(
-                        i,
-                        current_progress=last_progress + j,
+
+        def _progress_iter():
+            start = time.time()
+            last_progress = 0
+            while True:
+                self.update()
+                if (
+                    wait_for_max is not None and time.time() - start > wait_for_max
+                ):  # pragma: no cover
+                    raise RuntimeError(
+                        f"job not done in time, last status was '{self.status}'"
                     )
-                last_progress = current_progress
+
+                if self.status == Status.pending:  # pragma: no cover
+                    continue
+                elif self.status == Status.running and self.progress.total:
+                    if self.progress.current > last_progress:
+                        yield self.progress
+                        last_progress = self.progress.current
+                elif self.status == Status.cancelled:  # pragma: no cover
+                    if raise_exc:
+                        raise JobCancelled(f"job {self.job_id} cancelled")
+                    else:
+                        return
+                elif self.status == Status.failed:
+                    if raise_exc:
+                        raise JobFailed(
+                            f"job failed with {self.properties['exception']}"
+                        )
+                    else:  # pragma: no cover
+                        return
+                elif self.status == Status.done:
+                    if (
+                        self.progress.current is not None
+                        and self.progress.total is not None
+                    ) and (self.progress.current == self.progress.total):
+                        yield self.progress
+                    return
+                time.sleep(interval)
+
+        progress_iter = _progress_iter()
+        if smooth:
+            progress = next(progress_iter)
+            last_progress = progress.current
+            yield progress
+            for progress in progress_iter:
+                jump = progress.current - last_progress
+                for step in range(jump):
+                    time.sleep(interval / jump)
+                    yield Progress(
+                        total=progress.total,
+                        current=last_progress + step,
+                    )
+                last_progress = progress.current
         else:
             yield from progress_iter
 
@@ -434,7 +499,7 @@ class Client:
         interval: float = 0.3,
         wait_for_max: Optional[float] = None,
         raise_exc: bool = True,
-    ) -> Generator[dict, None, None]:
+    ) -> Generator[Progress, None, None]:
         """
         Yield job progress information.
 
@@ -444,51 +509,12 @@ class Client:
             Can either be a valid job ID or :last:, in which case the CLI will automatically
             determine the most recently updated job.
         """
-        start = time.time()
-        last_progress = 0
-        while True:
-            job = self.job(self.parse_job_id(job_id))
-            if (
-                wait_for_max is not None and time.time() - start > wait_for_max
-            ):  # pragma: no cover
-                raise RuntimeError(
-                    f"job not done in time, last status was '{job.status}'"
-                )
-            properties = job.to_dict()["properties"]
-            if job.status == Status.pending:  # pragma: no cover
-                continue
-            elif job.status == Status.running and properties.get("total_progress"):
-                current_progress = properties["current_progress"]
-                if current_progress > last_progress:
-                    yield dict(
-                        status=job.status,
-                        current_progress=current_progress,
-                        total_progress=properties["total_progress"],
-                    )
-                    last_progress = current_progress
-            elif job.status == Status.cancelled:  # pragma: no cover
-                if raise_exc:
-                    raise JobCancelled(f"job {job.job_id} cancelled")
-                else:
-                    return
-            elif job.status == Status.failed:
-                if raise_exc:
-                    raise JobFailed(f"job failed with {properties['exception']}")
-                else:  # pragma: no cover
-                    return
-            elif job.status == Status.done:
-                current_progress = properties.get("current_progress")
-                total_progress = properties.get("total_progress")
-                if (current_progress is not None and total_progress is not None) and (
-                    current_progress == total_progress
-                ):
-                    yield dict(
-                        status=job.status,
-                        current_progress=current_progress,
-                        total_progress=total_progress,
-                    )
-                return
-            time.sleep(interval)
+        job = self.job(self.parse_job_id(job_id))
+        yield from job.yield_progress(
+            wait_for_max=wait_for_max,
+            raise_exc=raise_exc,
+            interval=interval,
+        )
 
     def _get_kwargs(self, kwargs):
         """

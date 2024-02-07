@@ -4,7 +4,7 @@ import click
 import oyaml as yaml
 
 from mapchete_hub_cli.cli import options
-from mapchete_hub_cli.cli.progress import show_progress
+from mapchete_hub_cli.cli.progress import show_progress_bar
 from mapchete_hub_cli.client import JOB_STATUSES, Client, Job
 from mapchete_hub_cli.enums import Status
 from mapchete_hub_cli.time import pretty_time
@@ -67,7 +67,7 @@ def job(
             click.echo(job.properties.get("traceback"))
         if progress:  # pragma: no cover
             click.echo(f"job {job.job_id} {job.status}")
-            show_progress(client, job_id, disable=debug)
+            show_progress_bar(client, job_id, disable=debug)
         else:
             print_job_details(job, metadata_items=metadata_items, verbose=True)
     except Exception as e:  # pragma: no cover

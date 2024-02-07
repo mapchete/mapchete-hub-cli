@@ -47,29 +47,31 @@ def retry(
             jobs = client.jobs(**kwargs)
 
         def _yield_retryable_jobs(jobs):
-            for j in jobs:
-                if j.status not in [
+            for job in jobs:
+                if job.status not in [
                     *JOB_STATUSES["done"],
                     "aborting",
                 ]:  # pragma: no cover
-                    click.echo(f"Job {j.job_id} still in status {j.status}.")
+                    click.echo(f"Job {job.job_id} still in status {job.status}.")
                 else:
-                    yield j.job_id
+                    yield job
 
-        job_ids = [j for j in _yield_retryable_jobs(jobs)]
+        jobs = [j for j in _yield_retryable_jobs(jobs)]
 
-        if not job_ids:  # pragma: no cover
+        if not jobs:  # pragma: no cover
             click.echo("No retryable jobs found.")
             return
 
-        for job_id in job_ids:
-            click.echo(job_id)
+        for job in jobs:
+            click.echo(job.job_id)
         if force or click.confirm(
-            f"Do you really want to retry {len(job_ids)} job(s)?", abort=True
+            f"Do you really want to retry {len(jobs)} job(s)?", abort=True
         ):
-            for job_id in job_ids:
-                job = client.retry_job(job_id, use_old_image=use_old_image)
-                click.echo(f"job {job.job_id} {job.status}")
+            for job in jobs:
+                retried_job = job.retry(use_old_image=use_old_image)
+                click.echo(
+                    f"job {job.job_id} {job.status} and retried as {retried_job.job_id} ({retried_job.status})"
+                )
     except Exception as e:  # pragma: no cover
         if debug:
             raise
