@@ -50,7 +50,7 @@ COMMANDS = ["execute"]
 
 @dataclass
 class Job:
-    """Job metadata class."""
+    """Holds job metadata and provides interface with job."""
 
     status: Status
     job_id: str
@@ -89,7 +89,7 @@ class Job:
 
     def __repr__(self):  # pragma: no cover
         """Print Job."""
-        return f"Job(status={self.status}, job_id={self.job_id}, updated={self.last_updated})"
+        return f"Job(job_id={self.job_id}, status={self.status}, updated={self.last_updated})"
 
     def __hash__(self):
         return hash(self.job_id)
@@ -102,12 +102,15 @@ class Job:
         self.progress = job.progress
 
     def update(self):
+        """Update with remote metadata."""
         self._update(self.client.job(self.job_id))
 
     def cancel(self):
+        """Cancel job."""
         self._update(self.client.cancel_job(self.job_id))
 
     def retry(self, use_old_image: bool = False) -> Job:
+        """Retry and return new job."""
         return self.client.retry_job(self.job_id, use_old_image=use_old_image)
 
     def wait(self, wait_for_max=None, raise_exc=True):
@@ -163,6 +166,8 @@ class Job:
                 time.sleep(interval)
 
         progress_iter = _progress_iter()
+
+        # to make things smoother, interpolate progress jumps
         if smooth:
             progress = next(progress_iter)
             last_progress = progress.current
@@ -473,6 +478,9 @@ class Client:
         status: Optional[Union[List[Status], Status]] = None,
         **kwargs,
     ) -> Jobs:
+        """
+        Query interface for jobs.
+        """
         res = self.get(
             "jobs",
             timeout=self.timeout,
