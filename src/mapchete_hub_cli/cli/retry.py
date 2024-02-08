@@ -2,6 +2,7 @@ import click
 
 from mapchete_hub_cli.cli import options
 from mapchete_hub_cli.client import JOB_STATUSES, Client
+from mapchete_hub_cli.job import Jobs
 
 
 @click.command(short_help="Retry jobs.")
@@ -36,7 +37,7 @@ def retry(
     try:
         client = Client(**ctx.obj)
         if job_ids:
-            jobs = [client.job(job_id) for job_id in job_ids]
+            jobs = Jobs.from_jobs([client.job(job_id) for job_id in job_ids])
 
         else:
             if all([v is None for v in kwargs.values()]):  # pragma: no cover
@@ -46,32 +47,19 @@ def retry(
                 )
             jobs = client.jobs(**kwargs)
 
-        def _yield_retryable_jobs(jobs):
-            for job in jobs:
-                if job.status not in [
-                    *JOB_STATUSES["done"],
-                    "aborting",
-                ]:  # pragma: no cover
-                    click.echo(f"Job {job.job_id} still in status {job.status}.")
-                else:
-                    yield job
+        finished_jobs = jobs.finished_jobs(msg_writer=click.echo)
 
-        jobs = [j for j in _yield_retryable_jobs(jobs)]
-
-        if not jobs:  # pragma: no cover
+        if not finished_jobs:  # pragma: no cover
             click.echo("No retryable jobs found.")
             return
 
-        for job in jobs:
+        for job in finished_jobs:
             click.echo(job.job_id)
         if force or click.confirm(
-            f"Do you really want to retry {len(jobs)} job(s)?", abort=True
+            f"Do you really want to retry {len(finished_jobs)} job(s)?", abort=True
         ):
-            for job in jobs:
-                retried_job = job.retry(use_old_image=use_old_image)
-                click.echo(
-                    f"job {job.job_id} {job.status} and retried as {retried_job.job_id} ({retried_job.status})"
-                )
+            finished_jobs.retry(msg_writer=click.echo, use_old_image=use_old_image)
+
     except Exception as e:  # pragma: no cover
         if debug:
             raise

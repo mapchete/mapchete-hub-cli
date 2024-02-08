@@ -119,6 +119,7 @@ def execute(
                     show_progress_bar(job, disable=debug)
                 else:
                     click.echo(job.job_id)
+
         except Exception as e:  # pragma: no cover
             if debug:
                 raise

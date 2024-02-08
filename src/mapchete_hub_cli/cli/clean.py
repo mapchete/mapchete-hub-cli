@@ -1,5 +1,4 @@
 import logging
-from typing import Set
 
 import click
 import requests
@@ -58,12 +57,11 @@ def clean(
     - jobs which are running, have a scheduler but scheduler dashboard is not available\n
     """
     try:
-        client = Client(**ctx.obj)
-        jobs = stalled_jobs(
-            client=client,
+        jobs = Client(**ctx.obj).stalled_jobs(
             inactive_since=inactive_since,
             pending_since=pending_since,
             check_inactive_dashboard=not skip_dashboard_check,
+            msg_writer=click.echo,
         )
         if jobs:
             click.echo(f"found {len(jobs)} potentially stalled jobs:")
@@ -73,17 +71,12 @@ def clean(
                 f"Do you really want to cancel {'and retry ' if retry else ''}{len(jobs)} job(s)?",
                 abort=True,
             ):
-                for job in jobs:
-                    job.cancel()
-                    logger.debug(job.to_dict())
-                    if retry:
-                        retried_job = job.retry(use_old_image=use_old_image)
-                        click.echo(
-                            f"job {job.job_id} {job.status} and retried as {retried_job.job_id} ({retried_job.status})"
-                        )
-                    else:
-                        click.echo(f"job {job} {job.status}")
-
+                if retry:
+                    jobs.cancel_and_retry(
+                        msg_writer=click.echo, use_old_image=use_old_image
+                    )
+                else:
+                    jobs.cancel(msg_writer=click.echo)
         else:
             click.echo("No stalled jobs found.")
 
@@ -91,64 +84,3 @@ def clean(
         if debug:
             raise
         raise click.ClickException(str(exc))
-
-
-def stalled_jobs(
-    client: Client,
-    inactive_since: str = "5h",
-    pending_since: str = "3d",
-    check_inactive_dashboard: bool = True,
-) -> Set[Job]:
-    stalled = set()
-
-    # jobs which have been pending for too long
-    for job in client.jobs(
-        status=Status.pending,
-        to_date=date_to_str(passed_time_to_timestamp(pending_since)),
-    ):
-        logger.debug(
-            "job %s %s state since %s", job.job_id, job.status, job.last_updated
-        )
-        click.echo(
-            f"{job.job_id} {job.status} since {pretty_time_passed(job.last_updated)}"
-        )
-        stalled.add(job)
-
-    # jobs which have been inactive for too long
-    for status in [Status.parsing, Status.initializing, Status.running]:
-        for job in client.jobs(
-            status=status,
-            to_date=date_to_str(passed_time_to_timestamp(inactive_since)),
-        ):
-            logger.debug(
-                "job %s %s but has been inactive since %s",
-                job.job_id,
-                job.status,
-                job.last_updated,
-            )
-            click.echo(
-                f"{job.job_id} {job.status} but has been inactive since {pretty_time_passed(job.last_updated)}"
-            )
-            stalled.add(job)
-
-    # running jobs with unavailable dashboard
-    if check_inactive_dashboard:
-        for job in client.jobs(status=Status.running):
-            dashboard_link = job.properties.get("dask_dashboard_link")
-            # NOTE: jobs can be running without haveing a dashboard
-            if dashboard_link:
-                status_code = requests.get(dashboard_link).status_code
-                if status_code != 200:
-                    logger.debug(
-                        "job %s %s but dashboard %s returned status code %s",
-                        job.job_id,
-                        job.status,
-                        dashboard_link,
-                        status_code,
-                    )
-                    click.echo(
-                        f"{job.job_id} {job.status} but has inactive dashboard (status code {status_code}, job inactive since {pretty_time_passed(job.last_updated)})"
-                    )
-                    stalled.add(job)
-
-    return stalled

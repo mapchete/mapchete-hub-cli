@@ -12,22 +12,21 @@ import logging
 import os
 import time
 from collections import OrderedDict
-from dataclasses import dataclass
 from json.decoder import JSONDecodeError
-from typing import Generator, Iterator, List, Optional, Tuple, Union
+from typing import Callable, Generator, List, Optional, Tuple, Union
 
 import requests
 from requests.exceptions import HTTPError
 
 from mapchete_hub_cli.enums import Status
-from mapchete_hub_cli.exceptions import (
-    JobCancelled,
-    JobFailed,
-    JobNotFound,
-    JobRejected,
-)
+from mapchete_hub_cli.exceptions import JobNotFound, JobRejected
+from mapchete_hub_cli.job import Job, Jobs
 from mapchete_hub_cli.parser import load_mapchete_config
-from mapchete_hub_cli.time import date_to_str, passed_time_to_timestamp, str_to_date
+from mapchete_hub_cli.time import (
+    date_to_str,
+    passed_time_to_timestamp,
+    pretty_time_passed,
+)
 from mapchete_hub_cli.types import Progress
 
 logger = logging.getLogger(__name__)
@@ -46,190 +45,6 @@ JOB_STATUSES = {
     "done": [Status.done, Status.failed, Status.cancelled],
 }
 COMMANDS = ["execute"]
-
-
-@dataclass
-class Job:
-    """Holds job metadata and provides interface with job."""
-
-    status: Status
-    job_id: str
-    geoemtry: dict
-    bounds: tuple
-    properties: dict
-    last_updated: datetime.datetime
-    client: Client
-    progress: Progress
-    _dict: dict
-    __geo_interface__: dict
-
-    @staticmethod
-    def from_dict(response_dict: dict, client: Client) -> Job:
-        return Job(
-            status=Status[response_dict["properties"]["status"]],
-            job_id=response_dict["id"],
-            geoemtry=response_dict["geometry"],
-            bounds=tuple(response_dict["bounds"]),
-            properties=response_dict["properties"],
-            last_updated=str_to_date(response_dict["properties"]["updated"]),
-            client=client,
-            progress=Progress(
-                current=response_dict["properties"]["current_progress"] or 0,
-                total=response_dict["properties"]["total_progress"],
-            ),
-            _dict=response_dict,
-            __geo_interface__=response_dict["geometry"],
-        )
-
-    def to_dict(self) -> dict:
-        return self._dict
-
-    def to_json(self, indent=4) -> str:
-        return json.dumps(self.to_dict(), indent=indent)
-
-    def __repr__(self):  # pragma: no cover
-        """Print Job."""
-        return f"Job(job_id={self.job_id}, status={self.status}, updated={self.last_updated})"
-
-    def __hash__(self):
-        return hash(self.job_id)
-
-    def _update(self, job: Job):
-        self.status = job.status
-        self._dict = job._dict
-        self.properties = job.properties
-        self.last_updated = job.last_updated
-        self.progress = job.progress
-
-    def update(self):
-        """Update with remote metadata."""
-        self._update(self.client.job(self.job_id))
-
-    def cancel(self):
-        """Cancel job."""
-        self._update(self.client.cancel_job(self.job_id))
-
-    def retry(self, use_old_image: bool = False) -> Job:
-        """Retry and return new job."""
-        return self.client.retry_job(self.job_id, use_old_image=use_old_image)
-
-    def wait(self, wait_for_max=None, raise_exc=True):
-        """Block until job has finished processing."""
-        list(self.yield_progress(wait_for_max=wait_for_max, raise_exc=raise_exc))
-
-    def yield_progress(
-        self,
-        wait_for_max: Optional[float] = None,
-        raise_exc: bool = True,
-        interval: float = 0.3,
-        smooth: bool = False,
-    ) -> Generator[Progress, None, None]:
-        """Yield job progress messages."""
-
-        def _progress_iter():
-            start = time.time()
-            last_progress = 0
-            while True:
-                self.update()
-                if (
-                    wait_for_max is not None and time.time() - start > wait_for_max
-                ):  # pragma: no cover
-                    raise RuntimeError(
-                        f"job not done in time, last status was '{self.status}'"
-                    )
-
-                if self.status == Status.pending:  # pragma: no cover
-                    continue
-                elif self.status == Status.running and self.progress.total:
-                    if self.progress.current > last_progress:
-                        yield self.progress
-                        last_progress = self.progress.current
-                elif self.status == Status.cancelled:  # pragma: no cover
-                    if raise_exc:
-                        raise JobCancelled(f"job {self.job_id} cancelled")
-                    else:
-                        return
-                elif self.status == Status.failed:
-                    if raise_exc:
-                        raise JobFailed(
-                            f"job failed with {self.properties['exception']}"
-                        )
-                    else:  # pragma: no cover
-                        return
-                elif self.status == Status.done:
-                    if (
-                        self.progress.current is not None
-                        and self.progress.total is not None
-                    ) and (self.progress.current == self.progress.total):
-                        yield self.progress
-                    return
-                time.sleep(interval)
-
-        progress_iter = _progress_iter()
-
-        # to make things smoother, interpolate progress jumps
-        if smooth:
-            progress = next(progress_iter)
-            last_progress = progress.current
-            yield progress
-            for progress in progress_iter:
-                jump = progress.current - last_progress
-                for step in range(jump):
-                    time.sleep(interval / jump)
-                    yield Progress(
-                        total=progress.total,
-                        current=last_progress + step,
-                    )
-                last_progress = progress.current
-        else:
-            yield from progress_iter
-
-
-@dataclass
-class Jobs:
-    client: Client
-    _response_dict: dict
-    _jobs: Tuple[Job, ...]
-
-    @staticmethod
-    def from_dict(response_dict: dict, client: Client) -> Jobs:
-        return Jobs(
-            client=client,
-            _jobs=tuple(
-                Job.from_dict(job, client=client) for job in response_dict["features"]
-            ),
-            _response_dict=response_dict,
-        )
-
-    def last_job(self) -> Job:
-        return list(sorted(list(self._jobs), key=lambda x: x.last_updated))[-1]
-
-    def __iter__(self) -> Iterator[Job]:
-        return iter(self._jobs)
-
-    def __len__(self) -> int:
-        return len(self._jobs)
-
-    def __getitem__(self, job_id: str) -> Job:
-        for _job in self._jobs:
-            if job_id == _job.job_id:
-                return _job
-        else:
-            raise KeyError(f"job with id {job_id} not in {self}")
-
-    def __contains__(self, job: Union[Job, str]) -> bool:
-        job_id = job.job_id if isinstance(job, Job) else job
-        try:
-            self[job_id]
-            return True
-        except KeyError:
-            return False
-
-    def to_dict(self) -> dict:
-        return self._response_dict
-
-    def to_json(self, indent: int = 4) -> str:
-        return json.dumps(self.to_dict(), indent=indent)
 
 
 class Client:
@@ -523,6 +338,70 @@ class Client:
             raise_exc=raise_exc,
             interval=interval,
         )
+
+    def stalled_jobs(
+        self,
+        inactive_since: str = "5h",
+        pending_since: str = "3d",
+        check_inactive_dashboard: bool = True,
+        msg_writer: Optional[Callable] = None,
+    ) -> Jobs:
+        stalled = set()
+
+        # jobs which have been pending for too long
+        for job in self.jobs(
+            status=Status.pending,
+            to_date=date_to_str(passed_time_to_timestamp(pending_since)),
+        ):
+            logger.debug(
+                "job %s %s state since %s", job.job_id, job.status, job.last_updated
+            )
+            if msg_writer:
+                msg_writer(
+                    f"{job.job_id} {job.status} since {pretty_time_passed(job.last_updated)}"
+                )
+            stalled.add(job)
+
+        # jobs which have been inactive for too long
+        for status in [Status.parsing, Status.initializing, Status.running]:
+            for job in self.jobs(
+                status=status,
+                to_date=date_to_str(passed_time_to_timestamp(inactive_since)),
+            ):
+                logger.debug(
+                    "job %s %s but has been inactive since %s",
+                    job.job_id,
+                    job.status,
+                    job.last_updated,
+                )
+                if msg_writer:
+                    msg_writer(
+                        f"{job.job_id} {job.status} but has been inactive since {pretty_time_passed(job.last_updated)}"
+                    )
+                stalled.add(job)
+
+        # running jobs with unavailable dashboard
+        if check_inactive_dashboard:
+            for job in self.jobs(status=Status.running):
+                dashboard_link = job.properties.get("dask_dashboard_link")
+                # NOTE: jobs can be running without haveing a dashboard
+                if dashboard_link:
+                    status_code = requests.get(dashboard_link).status_code
+                    if status_code != 200:
+                        logger.debug(
+                            "job %s %s but dashboard %s returned status code %s",
+                            job.job_id,
+                            job.status,
+                            dashboard_link,
+                            status_code,
+                        )
+                        if msg_writer:
+                            msg_writer(
+                                f"{job.job_id} {job.status} but has inactive dashboard (status code {status_code}, job inactive since {pretty_time_passed(job.last_updated)})"
+                            )
+                        stalled.add(job)
+
+        return Jobs.from_jobs(stalled)
 
     def _get_kwargs(self, kwargs):
         """

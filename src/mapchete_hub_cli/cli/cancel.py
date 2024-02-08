@@ -1,5 +1,4 @@
 import logging
-from typing import Generator, List, Union
 
 import click
 
@@ -27,7 +26,7 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
         kwargs.update(from_date=kwargs.pop("since"), to_date=kwargs.pop("until"))
 
         if job_ids:
-            jobs = [client.job(job_id) for job_id in job_ids]
+            jobs = Jobs.from_jobs([client.job(job_id) for job_id in job_ids])
 
         else:
             if all([v is None for v in kwargs.values()]):  # pragma: no cover
@@ -37,31 +36,20 @@ def cancel(ctx, job_ids, debug=False, force=False, **kwargs):
                 )
             jobs = client.jobs(**kwargs)
 
-        jobs = list(yield_revokable_jobs(jobs))
+        unfinished_jobs = jobs.unfinished_jobs(msg_writer=click.echo)
 
-        if not jobs:  # pragma: no cover
+        if not unfinished_jobs:  # pragma: no cover
             click.echo("No revokable jobs found.")
             return
 
-        for job in jobs:
+        for job in unfinished_jobs:
             click.echo(job.job_id)
         if force or click.confirm(
-            f"Do you really want to cancel {len(jobs)} job(s)?", abort=True
+            f"Do you really want to cancel {len(unfinished_jobs)} job(s)?", abort=True
         ):
-            for job in jobs:
-                job.cancel()
-                logger.debug(job.to_dict())
-                click.echo(f"job {job.status}")
+            unfinished_jobs.cancel(msg_writer=click.echo)
 
     except Exception as e:  # pragma: no cover
         if debug:
             raise
         raise click.ClickException(e)
-
-
-def yield_revokable_jobs(jobs: Union[Jobs, List[Job]]) -> Generator[Job, None, None]:
-    for job in jobs:
-        if job.status in JOB_STATUSES["done"]:  # pragma: no cover
-            click.echo(f"Job {job.job_id} already in status {job.status}.")
-        else:
-            yield job
