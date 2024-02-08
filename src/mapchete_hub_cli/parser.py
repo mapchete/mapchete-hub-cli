@@ -72,7 +72,7 @@ def cleanup_datetime(value: Any) -> Any:
         return OrderedDict([(k, cleanup_datetime(v)) for k, v in value.items()])
     elif isinstance(value, (list, tuple)):
         return [cleanup_datetime(ii) for ii in value]
-    elif isinstance(value, datetime.date):
+    elif isinstance(value, datetime.date):  # pragma: no cover
         return str(value)
     else:
         return value

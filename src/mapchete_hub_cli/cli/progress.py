@@ -1,4 +1,5 @@
 import click
+import click_spinner
 from tqdm import tqdm
 
 from mapchete_hub_cli.cli import options
@@ -46,8 +47,9 @@ def show_progress_bar(job: Job, disable: bool = False, interval: float = 0.3):
     try:
         progress_iter = job.yield_progress(smooth=True, interval=interval)
         click.echo("wait for job progress...")
-        progress = next(progress_iter)
-        last_progress = progress.current
+        with click_spinner.Spinner():
+            progress = next(progress_iter)
+            last_progress = progress.current
         with tqdm(
             total=progress.total,
             initial=last_progress,

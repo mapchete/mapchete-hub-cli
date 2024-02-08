@@ -5,9 +5,9 @@ import oyaml as yaml
 
 from mapchete_hub_cli.cli import options
 from mapchete_hub_cli.cli.progress import show_progress_bar
-from mapchete_hub_cli.client import JOB_STATUSES, Client, Job
+from mapchete_hub_cli.client import Client, Job
 from mapchete_hub_cli.enums import Status
-from mapchete_hub_cli.time import pretty_time
+from mapchete_hub_cli.time import pretty_time, pretty_time_passed, str_to_date
 
 
 @click.command(short_help="Show job status.")
@@ -18,7 +18,6 @@ from mapchete_hub_cli.time import pretty_time
 @click.option("--show-config", is_flag=True, help="Print Mapchete config.")
 @click.option("--show-params", is_flag=True, help="Print Mapchete parameters.")
 @click.option("--show-process", is_flag=True, help="Print Mapchete process.")
-@options.opt_progress
 @options.opt_debug
 @click.pass_context
 def job(
@@ -29,7 +28,6 @@ def job(
     show_params=False,
     show_process=False,
     traceback=False,
-    progress=False,
     debug=False,
     metadata_items=None,
     **_,
@@ -51,10 +49,9 @@ def job(
             return
         elif show_params:
             for k, v in job.properties["mapchete"]["params"].items():
-                if isinstance(v, list):
-                    click.echo(f"{k}: {', '.join(map(str, v)) if v else None}")
-                else:
-                    click.echo(f"{k}: {v}")
+                click.echo(
+                    f"{k}: {', '.join(map(str, v)) if v else None}"
+                ) if isinstance(v, list) else click.echo(f"{k}: {v}")
             return
         elif show_process:
             process = job.properties["mapchete"]["config"].get("process")
@@ -65,11 +62,7 @@ def job(
         elif traceback:  # pragma: no cover
             click.echo(job.properties.get("exception"))
             click.echo(job.properties.get("traceback"))
-        if progress:  # pragma: no cover
-            click.echo(f"job {job.job_id} {job.status}")
-            show_progress_bar(client, job_id, disable=debug)
-        else:
-            print_job_details(job, metadata_items=metadata_items, verbose=True)
+        print_job_details(job, metadata_items=metadata_items, verbose=True)
     except Exception as e:  # pragma: no cover
         if debug:
             raise
@@ -93,7 +86,7 @@ def print_job_details(
 ):
     try:
         color = status_colors[job.status]
-    except KeyError:
+    except KeyError:  # pragma: no cover
         color = "white"
 
     mapchete_config = job.properties.get("mapchete", {}).get("config", {})
@@ -143,7 +136,9 @@ def print_job_details(
 
         # last received update
         last_update = job.properties.get("updated", "unknown")
-        click.echo(f"last received update: {last_update}")
+        click.echo(
+            f"last received update: {pretty_time_passed(str_to_date(last_update))} ago"
+        )
 
     if metadata_items:
         for i in metadata_items:

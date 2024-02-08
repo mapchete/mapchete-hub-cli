@@ -13,7 +13,7 @@ import os
 import time
 from collections import OrderedDict
 from json.decoder import JSONDecodeError
-from typing import Callable, Generator, List, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 import requests
 from requests.exceptions import HTTPError
@@ -196,10 +196,10 @@ class Client:
             timeout=self.timeout,
         )
 
-        if res.status_code != 201:
+        if res.status_code != 201:  # pragma: no cover
             try:
                 raise JobRejected(res.json())
-            except JSONDecodeError:  # pragma: no cover
+            except JSONDecodeError:
                 raise Exception(res.text)
         else:
             job_id = res.json()["id"]
@@ -246,7 +246,7 @@ class Client:
             # using outdated software
             try:
                 params["dask_specs"].pop("image")
-            except KeyError:
+            except KeyError:  # pragma: no cover
                 pass
         return self.start_job(
             config=existing_job.properties["mapchete"]["config"],
@@ -270,7 +270,7 @@ class Client:
             return Job.from_dict(res.json(), client=self)
         elif res.status_code == 404:
             raise JobNotFound(f"job {job_id} does not exist")
-        else:
+        else:  # pragma: no cover
             raise ValueError(f"return code should be 200, but is {res.status_code}")
 
     def job_status(self, job_id: str) -> Status:
@@ -312,32 +312,9 @@ class Client:
         if res.status_code != 200:  # pragma: no cover
             try:
                 raise Exception(res.json())
-            except JSONDecodeError:  # pragma: no cover
+            except JSONDecodeError:
                 raise Exception(res.text)
         return Jobs.from_dict(res.json(), client=self)
-
-    def job_progress(
-        self,
-        job_id: str,
-        interval: float = 0.3,
-        wait_for_max: Optional[float] = None,
-        raise_exc: bool = True,
-    ) -> Generator[Progress, None, None]:
-        """
-        Yield job progress information.
-
-        Parameters
-        ----------
-        job_id : str
-            Can either be a valid job ID or :last:, in which case the CLI will automatically
-            determine the most recently updated job.
-        """
-        job = self.job(self.parse_job_id(job_id))
-        yield from job.yield_progress(
-            wait_for_max=wait_for_max,
-            raise_exc=raise_exc,
-            interval=interval,
-        )
 
     def stalled_jobs(
         self,
@@ -352,7 +329,7 @@ class Client:
         for job in self.jobs(
             status=Status.pending,
             to_date=date_to_str(passed_time_to_timestamp(pending_since)),
-        ):
+        ):  # pragma: no cover
             logger.debug(
                 "job %s %s state since %s", job.job_id, job.status, job.last_updated
             )
@@ -367,7 +344,7 @@ class Client:
             for job in self.jobs(
                 status=status,
                 to_date=date_to_str(passed_time_to_timestamp(inactive_since)),
-            ):
+            ):  # pragma: no cover
                 logger.debug(
                     "job %s %s but has been inactive since %s",
                     job.job_id,
@@ -382,7 +359,7 @@ class Client:
 
         # running jobs with unavailable dashboard
         if check_inactive_dashboard:
-            for job in self.jobs(status=Status.running):
+            for job in self.jobs(status=Status.running):  # pragma: no cover
                 dashboard_link = job.properties.get("dask_dashboard_link")
                 # NOTE: jobs can be running without haveing a dashboard
                 if dashboard_link:
@@ -412,7 +389,7 @@ class Client:
         """
         if self._test_client:  # pragma: no cover
             kwargs.pop("timeout", None)
-        if self._user is not None and self._password is not None:
+        if self._user is not None and self._password is not None:  # pragma: no cover
             kwargs.update(auth=(self._user, self._password))
         return kwargs
 
@@ -424,9 +401,8 @@ def to_statuses(status: Optional[Union[List[Status], Status]] = None) -> List[St
     def to_status(s: Union[str, Status]) -> Status:
         return s if isinstance(s, Status) else Status[s]
 
-    if status is None:
-        return []
-    elif isinstance(status, list):
+    status = status or []
+    if isinstance(status, list):  # pragma: no cover
         return [to_status(s) for s in status]
     else:
         return [to_status(status)]

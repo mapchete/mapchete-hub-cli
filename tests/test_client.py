@@ -7,7 +7,7 @@ import pytest
 from shapely.geometry import shape
 
 from mapchete_hub_cli import exceptions
-from mapchete_hub_cli.client import Job, Status
+from mapchete_hub_cli.client import Jobs, Status
 
 
 def test_get_root(mhub_client):
@@ -92,6 +92,13 @@ def test_job_status(mhub_client, example_config_json):
     """Return job status."""
     job = mhub_client.start_job(**example_config_json)
     assert mhub_client.job_status(job.job_id) == Status.done
+
+
+def test_job_progress(mhub_client, example_config_json):
+    """Return job status."""
+    job = mhub_client.start_job(**example_config_json)
+    [progress for progress in job.yield_progress(smooth=True)]
+    assert [progress for progress in job.yield_progress(smooth=True)]
 
 
 def test_last_job_status(mhub_client, example_config_json):
@@ -247,3 +254,14 @@ def test_jobs(mhub_client, example_config_json):
 
     # make sure jobs are considered the same
     assert len(set([job1, job2])) == 1
+
+
+def test_stalled_jobs(mhub_client, example_config_json):
+    def _writer_mock(msg):
+        assert msg
+
+    assert isinstance(mhub_client.stalled_jobs(), Jobs)
+    assert isinstance(mhub_client.stalled_jobs(inactive_since="1s"), Jobs)
+    assert isinstance(mhub_client.stalled_jobs(pending_since="1s"), Jobs)
+    assert isinstance(mhub_client.stalled_jobs(check_inactive_dashboard=False), Jobs)
+    assert isinstance(mhub_client.stalled_jobs(msg_writer=_writer_mock), Jobs)

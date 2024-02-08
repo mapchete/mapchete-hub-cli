@@ -64,6 +64,20 @@ def test_execute(mhub_integration_client, cli, example_config_mapchete):
     not ENDPOINT_AVAILABLE,
     reason="requires up and running endpoint using docker-compose",
 )
+def test_execute_zones(mhub_integration_client, cli, example_config_mapchete):
+    result = cli.run(
+        f"execute {example_config_mapchete.path} --make-zones-on-zoom 5 --bounds 0 1 2 3"
+    )
+    assert result.exit_code == 0
+    job = mhub_integration_client.job(":last:")
+    job.wait(wait_for_max=120)
+    assert job.status == Status.done
+
+
+@pytest.mark.skipif(
+    not ENDPOINT_AVAILABLE,
+    reason="requires up and running endpoint using docker-compose",
+)
 def test_execute_dask_spec_json(
     mhub_integration_client, cli, example_config_mapchete, custom_dask_specs_json
 ):
@@ -121,13 +135,10 @@ def test_execute_errors(cli, example_config_mapchete):
     reason="requires up and running endpoint using docker-compose",
 )
 def test_progress(mhub_integration_client, cli, example_config_mapchete):
-    job_name = uuid4().hex
-    result = cli.run(f"execute {example_config_mapchete.path} --job-name {job_name}")
+    result = cli.run(f"execute {example_config_mapchete.path}")
     assert result.exit_code == 0
-    job_id = result.output.strip()
 
-    result = cli.run(f"progress {job_id}")
-    print(result.output)
+    result = cli.run("progress :last:")
     assert result.exit_code == 0
 
 
@@ -358,4 +369,14 @@ def test_retry_by_search(mhub_integration_client, cli, example_config_mapchete):
 
     # retry job
     result = cli.run("retry --since 5s -f")
+    assert result.exit_code == 0
+
+
+@pytest.mark.skipif(
+    not ENDPOINT_AVAILABLE,
+    reason="requires up and running endpoint using docker-compose",
+)
+def test_clean(cli):
+    # execute job
+    result = cli.run("clean --force")
     assert result.exit_code == 0

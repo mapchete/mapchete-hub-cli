@@ -57,7 +57,7 @@ def execute(
     client = Client(**ctx.obj)
     for mapchete_file in mapchete_files:
         try:
-            if make_zones_on_zoom is not None and bounds is None:
+            if make_zones_on_zoom is not None and bounds is None:  # pragma: no cover
                 raise click.UsageError("--make-zones-on-zoom requires --bounds")
             elif make_zones_on_zoom is not None or zone is not None:
                 try:
@@ -84,7 +84,7 @@ def execute(
                         if (bounds and not full_zones)
                         else tile.bounds()
                     )
-                    if len(tiles) >= zones_wait_count:
+                    if len(tiles) >= zones_wait_count:  # pragma: no cover
                         sleep(zones_wait_seconds)
                     job = client.start_job(
                         command="execute",

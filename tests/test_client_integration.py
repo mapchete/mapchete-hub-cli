@@ -7,6 +7,7 @@ import requests
 
 from mapchete_hub_cli.client import Status
 from mapchete_hub_cli.exceptions import JobAborting, JobCancelled
+from mapchete_hub_cli.job import Jobs
 
 TEST_ENDPOINT = os.environ.get("MHUB_HOST", "http://0.0.0.0:5000")
 
@@ -91,6 +92,28 @@ def test_job_status(mhub_integration_client, example_config_json):
     """Return job status."""
     job = mhub_integration_client.start_job(**example_config_json)
     assert mhub_integration_client.job_status(job.job_id) in todo_or_doing
+
+
+@pytest.mark.skipif(
+    not ENDPOINT_AVAILABLE,
+    reason="requires up and running endpoint using docker-compose",
+)
+def test_job_progress(mhub_integration_client, example_config_json):
+    """Return job status."""
+    job = mhub_integration_client.start_job(**example_config_json)
+    assert [progress for progress in job.yield_progress(smooth=True)]
+
+
+@pytest.mark.skipif(
+    not ENDPOINT_AVAILABLE,
+    reason="requires up and running endpoint using docker-compose",
+)
+def test_jobs_cancel_and_retry(mhub_integration_client, example_config_json):
+    """Return job status."""
+    job = mhub_integration_client.start_job(**example_config_json)
+    jobs = Jobs.from_jobs([job])
+    retried_jobs = jobs.cancel_and_retry()
+    assert retried_jobs
 
 
 @pytest.mark.skipif(

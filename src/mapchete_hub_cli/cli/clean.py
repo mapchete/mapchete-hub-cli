@@ -57,26 +57,26 @@ def clean(
     - jobs which are running, have a scheduler but scheduler dashboard is not available\n
     """
     try:
-        jobs = Client(**ctx.obj).stalled_jobs(
+        stalled_jobs = Client(**ctx.obj).stalled_jobs(
             inactive_since=inactive_since,
             pending_since=pending_since,
             check_inactive_dashboard=not skip_dashboard_check,
             msg_writer=click.echo,
         )
-        if jobs:
-            click.echo(f"found {len(jobs)} potentially stalled jobs:")
-            for job in jobs:
+        if stalled_jobs:  # pragma: no cover
+            click.echo(f"found {len(stalled_jobs)} potentially stalled jobs:")
+            for job in stalled_jobs:
                 click.echo(job.job_id)
             if force or click.confirm(
-                f"Do you really want to cancel {'and retry ' if retry else ''}{len(jobs)} job(s)?",
+                f"Do you really want to cancel {'and retry ' if retry else ''}{len(stalled_jobs)} job(s)?",
                 abort=True,
             ):
                 if retry:
-                    jobs.cancel_and_retry(
+                    stalled_jobs.cancel_and_retry(
                         msg_writer=click.echo, use_old_image=use_old_image
                     )
                 else:
-                    jobs.cancel(msg_writer=click.echo)
+                    stalled_jobs.cancel(msg_writer=click.echo)
         else:
             click.echo("No stalled jobs found.")
 

@@ -116,9 +116,9 @@ class Job:
                         f"job not done in time, last status was '{self.status}'"
                     )
 
-                if self.status == Status.pending:  # pragma: no cover
-                    continue
-                elif self.status == Status.running and self.progress.total:
+                # if status is Status.pending, Status.parsing or Status.initializing,
+                # we wait and try again
+                if self.status == Status.running and self.progress.total:
                     if self.progress.current > last_progress:
                         yield self.progress
                         last_progress = self.progress.current
@@ -159,7 +159,7 @@ class Job:
                         current=last_progress + step,
                     )
                 last_progress = progress.current
-        else:
+        else:  # pragma: no cover
             yield from progress_iter
 
 
@@ -185,7 +185,7 @@ class Jobs:
         """Return job which was last updated."""
         return list(sorted(list(self._jobs), key=lambda x: x.last_updated))[-1]
 
-    def cancel(self, msg_writer: Optional[Callable]):
+    def cancel(self, msg_writer: Optional[Callable] = None):
         for job in self:
             job.cancel()
             if msg_writer:
@@ -193,7 +193,7 @@ class Jobs:
 
     def _retry(
         self,
-        msg_writer: Optional[Callable],
+        msg_writer: Optional[Callable] = None,
         use_old_image: bool = False,
         cancel: bool = False,
     ) -> Jobs:
@@ -210,20 +210,20 @@ class Jobs:
         return Jobs.from_jobs(retried_jobs)
 
     def cancel_and_retry(
-        self, msg_writer: Optional[Callable], use_old_image: bool = False
+        self, msg_writer: Optional[Callable] = None, use_old_image: bool = False
     ) -> Jobs:
         return self._retry(
             msg_writer=msg_writer, use_old_image=use_old_image, cancel=True
         )
 
     def retry(
-        self, msg_writer: Optional[Callable], use_old_image: bool = False
+        self, msg_writer: Optional[Callable] = None, use_old_image: bool = False
     ) -> Jobs:
         return self._retry(
             msg_writer=msg_writer, use_old_image=use_old_image, cancel=False
         )
 
-    def finished_jobs(self, msg_writer: Optional[Callable]) -> Jobs:
+    def finished_jobs(self, msg_writer: Optional[Callable] = None) -> Jobs:
         finished_jobs = []
         for job in self:
             if job.status not in [
@@ -237,7 +237,7 @@ class Jobs:
                 finished_jobs.append(job)
         return Jobs.from_jobs(finished_jobs)
 
-    def unfinished_jobs(self, msg_writer: Optional[Callable]) -> Jobs:
+    def unfinished_jobs(self, msg_writer: Optional[Callable] = None) -> Jobs:
         unfinished_jobs = []
         for job in self:
             if job.status in [
@@ -275,7 +275,7 @@ class Jobs:
     def to_dict(self) -> dict:
         if self._response_dict:
             return self._response_dict
-        else:
+        else:  # pragma: no cover
             return {
                 "type": "FeatureCollection",
                 "features": [job.to_dict() for job in self],
@@ -285,7 +285,7 @@ class Jobs:
         return json.dumps(self.to_dict(), indent=indent)
 
 
-class JobClientProtocol(Protocol):
+class JobClientProtocol(Protocol):  # pragma: no cover
     def cancel_job(self, job_id: str) -> Job:
         ...
 

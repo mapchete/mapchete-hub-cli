@@ -1,10 +1,8 @@
 import click
 from click_plugins import with_plugins
 
-from mapchete_hub_cli import DEFAULT_TIMEOUT, JOB_STATUSES, __version__
-from mapchete_hub_cli.cli import options
+from mapchete_hub_cli import DEFAULT_TIMEOUT, __version__
 from mapchete_hub_cli.client import Client
-from mapchete_hub_cli.time import pretty_time
 
 try:
     from importlib import metadata
