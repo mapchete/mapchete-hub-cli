@@ -1,4 +1,4 @@
-from mapchete_hub_cli._client import (
+from mapchete_hub_cli.client import (
     COMMANDS,
     DEFAULT_TIMEOUT,
     JOB_STATUSES,

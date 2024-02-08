@@ -1,25 +1,35 @@
 from datetime import datetime, timedelta
+from typing import Union
 
 
-def str_to_date(date_str) -> datetime:
+def str_to_date(date_str: str) -> datetime:
     """Convert string to datetime object."""
-    if "T" in date_str:
-        add_zulu = "Z" if date_str.endswith("Z") else ""
-        try:
-            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%f" + add_zulu)
-        except ValueError:
-            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S" + add_zulu)
-    else:
-        values = date_str.split("-")
-        if len(values) != 3:
-            raise ValueError(f"cannot parse {date_str} to timestamp")
-        # for e.g. 2024-01-01
-        year, month, day = values
-        return datetime(year, month, day)
+    for divider in ["T", " "]:
+        if divider in date_str:
+            add_zulu = "Z" if date_str.endswith("Z") else ""
+            try:
+                return datetime.strptime(
+                    date_str, f"%Y-%m-%d{divider}%H:%M:%S.%f" + add_zulu
+                )
+            except ValueError:
+                return datetime.strptime(
+                    date_str, f"%Y-%m-%d{divider}%H:%M:%S" + add_zulu
+                )
+    values = date_str.split("-")
+    if len(values) != 3:
+        raise ValueError(f"cannot parse {date_str} to timestamp")
+    # for e.g. 2024-01-01
+    try:
+        year, month, day = map(int, values)
+    except ValueError:  # pragma: no cover
+        raise ValueError(f"cannot extract year, month and day from {date_str}")
+    return datetime(year, month, day)
 
 
-def date_to_str(date_obj, microseconds=True) -> str:
+def date_to_str(date_obj: Union[str, datetime], microseconds=True) -> str:
     """Return string from datetime object in the format."""
+    if isinstance(date_obj, str):
+        date_obj = str_to_date(date_obj)
     return date_obj.strftime(
         "%Y-%m-%dT%H:%M:%S.%fZ" if microseconds else "%Y-%m-%dT%H:%M:%SZ"
     )

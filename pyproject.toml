@@ -25,6 +25,7 @@ classifiers = [
 dependencies = [
     "click",
     "oyaml",
+    "pydantic",
     "requests",
     "tqdm",
 ]
@@ -42,10 +43,17 @@ test = [
 ]
 
 [project.scripts]
-mhub = "mapchete_hub_cli.cli:mhub"
+mhub = "mapchete_hub_cli.cli.main:mhub"
 
-[project.entry-points."mapchete.cli.commands"]
-mhub = "mapchete_hub_cli.cli:mhub"
+[project.entry-points."mapchete_hub_cli.cli.commands"]
+cancel = "mapchete_hub_cli.cli.cancel:cancel"
+clean = "mapchete_hub_cli.cli.clean:clean"
+execute = "mapchete_hub_cli.cli.execute:execute"
+job = "mapchete_hub_cli.cli.job:job"
+jobs = "mapchete_hub_cli.cli.jobs:jobs"
+processes = "mapchete_hub_cli.cli.processes:processes"
+progress = "mapchete_hub_cli.cli.progress:progress"
+retry = "mapchete_hub_cli.cli.retry:retry"
 
 [project.urls]
 Homepage = "https://gitlab.eox.at/maps/mapchete_hub_cli"

@@ -4,9 +4,10 @@ import time
 
 import pytest
 import requests
-from shapely.geometry import shape
 
+from mapchete_hub_cli.client import Status
 from mapchete_hub_cli.exceptions import JobAborting, JobCancelled
+from mapchete_hub_cli.job import Jobs
 
 TEST_ENDPOINT = os.environ.get("MHUB_HOST", "http://0.0.0.0:5000")
 
@@ -21,6 +22,13 @@ def _endpoint_available():
 
 ENDPOINT_AVAILABLE = _endpoint_available()
 
+todo_or_doing = [
+    Status.pending,
+    Status.running,
+    Status.parsing,
+    Status.initializing,
+]
+
 
 @pytest.mark.skipif(
     not ENDPOINT_AVAILABLE,
@@ -29,9 +37,13 @@ ENDPOINT_AVAILABLE = _endpoint_available()
 def test_start_job(mhub_integration_client, example_config_json):
     """Start a job and return job status."""
     job = mhub_integration_client.start_job(**example_config_json)
-    assert job.status_code == 201
-    # running the TestClient sequentially actually results in a job status of "parsing" for now
-    assert job.status == "parsing"
+    # running the TestClient sequentially actually results in a job status of Status.parsing for now
+    assert job.status in [
+        Status.pending,
+        Status.parsing,
+        Status.initializing,
+        Status.running,
+    ]
 
 
 @pytest.mark.skipif(
@@ -42,11 +54,10 @@ def test_cancel_job(mhub_integration_client, example_config_json):
     """Cancel existing job."""
     job = mhub_integration_client.start_job(**example_config_json)
     job = mhub_integration_client.cancel_job(job.job_id)
-    assert job.status_code == 200
     with pytest.raises((JobAborting, JobCancelled)):
         job.wait(wait_for_max=120)
     job = mhub_integration_client.job(job.job_id)
-    assert job.status in ["cancelled", "aborting"]
+    assert job.status == Status.cancelled
 
 
 @pytest.mark.skipif(
@@ -57,7 +68,7 @@ def test_retry_job(mhub_integration_client, example_config_json):
     """Retry a job and return job status."""
     job = mhub_integration_client.start_job(**example_config_json)
     retried_job = mhub_integration_client.retry_job(job.job_id)
-    assert retried_job.status_code == 201
+    assert retried_job.status in todo_or_doing
 
 
 @pytest.mark.skipif(
@@ -68,8 +79,7 @@ def test_job(mhub_integration_client, example_config_json):
     """Return job metadata."""
     job = mhub_integration_client.start_job(**example_config_json)
     job = mhub_integration_client.job(job.job_id)
-    assert job.status_code == 200
-    assert job.status in ["parsing", "initializing", "running"]
+    assert job.status in todo_or_doing
     assert job.to_dict()
     assert isinstance(job.to_dict(), dict)
 
@@ -81,11 +91,29 @@ def test_job(mhub_integration_client, example_config_json):
 def test_job_status(mhub_integration_client, example_config_json):
     """Return job status."""
     job = mhub_integration_client.start_job(**example_config_json)
-    assert mhub_integration_client.job_status(job.job_id) in [
-        "running",
-        "parsing",
-        "initializing",
-    ]
+    assert mhub_integration_client.job_status(job.job_id) in todo_or_doing
+
+
+@pytest.mark.skipif(
+    not ENDPOINT_AVAILABLE,
+    reason="requires up and running endpoint using docker-compose",
+)
+def test_job_progress(mhub_integration_client, example_config_json):
+    """Return job status."""
+    job = mhub_integration_client.start_job(**example_config_json)
+    assert [progress for progress in job.yield_progress(smooth=True)]
+
+
+@pytest.mark.skipif(
+    not ENDPOINT_AVAILABLE,
+    reason="requires up and running endpoint using docker-compose",
+)
+def test_jobs_cancel_and_retry(mhub_integration_client, example_config_json):
+    """Return job status."""
+    job = mhub_integration_client.start_job(**example_config_json)
+    jobs = Jobs.from_jobs([job])
+    retried_jobs = jobs.cancel_and_retry()
+    assert retried_jobs
 
 
 @pytest.mark.skipif(
