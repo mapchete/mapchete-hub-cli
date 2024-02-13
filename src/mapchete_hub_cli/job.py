@@ -31,6 +31,7 @@ class Job:
 
     status: Status
     job_id: str
+    name: str
     geoemtry: dict
     bounds: tuple
     properties: dict
@@ -45,6 +46,7 @@ class Job:
         return Job(
             status=Status[response_dict["properties"]["status"]],
             job_id=response_dict["id"],
+            name=response_dict["properties"]["job_name"],
             geoemtry=response_dict["geometry"],
             bounds=tuple(response_dict["bounds"]),
             properties=response_dict["properties"],
@@ -66,7 +68,7 @@ class Job:
 
     def __repr__(self):  # pragma: no cover
         """Print Job."""
-        return f"Job(job_id={self.job_id}, status={self.status}, updated={self.last_updated})"
+        return f"Job(id={self.job_id}, name={self.name}, status={self.status}, updated={self.last_updated})"
 
     def __hash__(self):
         return hash(self.job_id)
@@ -189,7 +191,7 @@ class Jobs:
         for job in self:
             job.cancel()
             if msg_writer:
-                msg_writer(f"job {job.job_id} {job.status}")
+                msg_writer(f"job {job.job_id} ({job.name}) {job.status}")
 
     def _retry(
         self,
@@ -205,7 +207,7 @@ class Jobs:
             retried_jobs.append(retried_job)
             if msg_writer:
                 msg_writer(
-                    f"job {job.job_id} {job.status} and retried as {retried_job.job_id} ({retried_job.status})"
+                    f"job {job.job_id} ({job.name}) {job.status} and retried as {retried_job.job_id} ({retried_job.status})"
                 )
         return Jobs.from_jobs(retried_jobs)
 
@@ -232,7 +234,9 @@ class Jobs:
                 Status.cancelled,
             ]:  # pragma: no cover
                 if msg_writer:
-                    msg_writer(f"Job {job.job_id} is still in status {job.status}.")
+                    msg_writer(
+                        f"Job {job.job_id} ({job.name}) is still in status {job.status}."
+                    )
             else:
                 finished_jobs.append(job)
         return Jobs.from_jobs(finished_jobs)
@@ -246,7 +250,9 @@ class Jobs:
                 Status.cancelled,
             ]:  # pragma: no cover
                 if msg_writer:
-                    msg_writer(f"Job {job.job_id} is in status {job.status}.")
+                    msg_writer(
+                        f"Job {job.job_id} ({job.name}) is in status {job.status}."
+                    )
             else:
                 unfinished_jobs.append(job)
         return Jobs.from_jobs(unfinished_jobs)

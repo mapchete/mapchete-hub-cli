@@ -29,6 +29,7 @@ from mapchete_hub_cli.parser import load_mapchete_config
 @options.opt_zones_wait_count
 @options.opt_zones_wait_seconds
 @options.opt_zone
+@options.opt_force
 @click.pass_context
 def execute(
     ctx,
@@ -46,6 +47,7 @@ def execute(
     zones_wait_seconds=10,
     job_name=None,
     zone=None,
+    force=False,
     **kwargs,
 ):
     """Execute a process."""
@@ -73,31 +75,34 @@ def execute(
                     if make_zones_on_zoom
                     else [tp.tile(*zone)]
                 )
-                for tile in tiles:
-                    zone_job_name = (
-                        f"{job_name}-{tile.zoom}-{tile.row}-{tile.col}"
-                        if job_name
-                        else None
-                    )
-                    process_bounds = (
-                        bounds_intersection(bounds, tile.bounds())
-                        if (bounds and not full_zones)
-                        else tile.bounds()
-                    )
-                    if len(tiles) >= zones_wait_count:  # pragma: no cover
-                        sleep(zones_wait_seconds)
-                    job = client.start_job(
-                        command="execute",
-                        config=mapchete_file,
-                        params=dict(
-                            kwargs,
-                            bounds=process_bounds,
-                            mode="overwrite" if overwrite else "continue",
-                            dask_settings=dask_settings,
-                            job_name=zone_job_name,
-                        ),
-                    )
-                    click.echo(job.job_id)
+                if force or click.confirm(
+                    f"Do you really want to submit {len(tiles)} job(s)?", abort=True
+                ):
+                    for tile in tiles:
+                        zone_job_name = (
+                            f"{job_name}-{tile.zoom}-{tile.row}-{tile.col}"
+                            if job_name
+                            else None
+                        )
+                        process_bounds = (
+                            bounds_intersection(bounds, tile.bounds())
+                            if (bounds and not full_zones)
+                            else tile.bounds()
+                        )
+                        if len(tiles) >= zones_wait_count:  # pragma: no cover
+                            sleep(zones_wait_seconds)
+                        job = client.start_job(
+                            command="execute",
+                            config=mapchete_file,
+                            params=dict(
+                                kwargs,
+                                bounds=process_bounds,
+                                mode="overwrite" if overwrite else "continue",
+                                dask_settings=dask_settings,
+                                job_name=zone_job_name,
+                            ),
+                        )
+                        click.echo(job.job_id)
             else:
                 job = client.start_job(
                     command="execute",
