@@ -2,6 +2,16 @@
 Changelog
 #########
 
+
+---------------------
+2024.2.2 - 2024-02-15
+---------------------
+
+    * core
+
+        * better messages: ask before submitting a bunch of jobs & also print job names
+
+
 ---------------------
 2024.2.1 - 2024-02-06
 ---------------------

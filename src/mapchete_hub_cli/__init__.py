@@ -19,4 +19,4 @@ __all__ = [
     "MHUB_CLI_ZONES_WAIT_TIME_SECONDS",
     "load_mapchete_config",
 ]
-__version__ = "2024.2.1"
+__version__ = "2024.2.2"
