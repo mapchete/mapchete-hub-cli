@@ -33,6 +33,8 @@ dependencies = [
 
 [project.optional-dependencies]
 zones = [
+    "mapchete",
+    "shapely",
     "tilematrix"
 ]
 test = [
