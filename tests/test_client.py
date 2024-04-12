@@ -54,15 +54,12 @@ def test_start_job_failing_process(mhub_client, example_config_process_exception
     assert mhub_client.job(job.job_id).status == Status.failed
 
 
-@pytest.mark.skip(
-    reason="the background task does not run in the background in TestClient"
-)
 def test_cancel_job(mhub_client, example_config_json):
     """Cancel existing job."""
     job = mhub_client.start_job(**example_config_json)
     job = mhub_client.cancel_job(job.job_id)
     # running the TestClient sequentially actually results in a job status of Status.done for now
-    assert mhub_client.job(job.job_id).status == Status.failed
+    assert mhub_client.job(job.job_id).status == Status.cancelled
 
 
 def test_retry_job(mhub_client, example_config_json):
@@ -83,6 +80,7 @@ def test_job(mhub_client, example_config_json):
     """Return job metadata."""
     job = mhub_client.start_job(**example_config_json)
     job = mhub_client.job(job.job_id)
+    job.wait(wait_for_max=120)
     assert job.status == Status.done
     assert job.to_dict()
     assert isinstance(job.to_dict(), dict)
@@ -91,6 +89,7 @@ def test_job(mhub_client, example_config_json):
 def test_job_status(mhub_client, example_config_json):
     """Return job status."""
     job = mhub_client.start_job(**example_config_json)
+    job.wait(wait_for_max=120)
     assert mhub_client.job_status(job.job_id) == Status.done
 
 
@@ -103,7 +102,7 @@ def test_job_progress(mhub_client, example_config_json):
 
 def test_last_job_status(mhub_client, example_config_json):
     """Return job status."""
-    mhub_client.start_job(**example_config_json)
+    mhub_client.start_job(**example_config_json).wait(wait_for_max=120)
     assert mhub_client.job_status(":last:") == Status.done
 
 
@@ -133,15 +132,17 @@ def test_list_jobs_output_path(mhub_client, example_config_json):
 
 
 def test_list_jobs_status(mhub_client, example_config_json):
-    job_id = mhub_client.start_job(
+    job = mhub_client.start_job(
         **dict(example_config_json, params=dict(example_config_json["params"], zoom=2))
-    ).job_id
+    )
+
+    job.wait(wait_for_max=120)
 
     jobs = mhub_client.jobs(status=Status.done)
-    assert job_id in jobs
+    assert job.job_id in jobs
 
     jobs = mhub_client.jobs(status=Status.cancelled)
-    assert job_id not in jobs
+    assert job.job_id not in jobs
 
 
 def test_list_jobs_job_name(mhub_client, example_config_json):

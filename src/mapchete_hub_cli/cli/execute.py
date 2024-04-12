@@ -48,6 +48,7 @@ def execute(
     job_name=None,
     zone=None,
     force=False,
+    area=None,
     **kwargs,
 ):
     """Execute a process."""
@@ -59,10 +60,16 @@ def execute(
     client = Client(**ctx.obj)
     for mapchete_file in mapchete_files:
         try:
-            if make_zones_on_zoom is not None and bounds is None:  # pragma: no cover
-                raise click.UsageError("--make-zones-on-zoom requires --bounds")
+            if make_zones_on_zoom is not None and (
+                bounds is None and area is None
+            ):  # pragma: no cover
+                raise click.UsageError(
+                    "--make-zones-on-zoom requires --bounds and/or --area"
+                )
             elif make_zones_on_zoom is not None or zone is not None:
                 try:
+                    from mapchete.config.parse import guess_geometry
+                    from shapely.geometry import box
                     from tilematrix import TilePyramid
                 except ImportError:  # pragma: no cover
                     raise ImportError(
@@ -70,11 +77,25 @@ def execute(
                     )
                 config = load_mapchete_config(mapchete_file)
                 tp = TilePyramid(config["pyramid"]["grid"])
-                tiles = list(
-                    tp.tiles_from_bounds(bounds, make_zones_on_zoom)
-                    if make_zones_on_zoom
-                    else [tp.tile(*zone)]
-                )
+                if area:
+                    geometry, crs = guess_geometry(area)
+                    if crs != tp.crs:  # pragma: no cover
+                        raise ValueError(
+                            f"area CRS ({crs}) must be the same as TilePyramid CRS ({tp.crs})"
+                        )
+                    if bounds:
+                        geometry = geometry.intersection(box(*bounds))
+                    tiles = list(
+                        tp.tiles_from_geom(geometry, make_zones_on_zoom)
+                        if make_zones_on_zoom
+                        else [tp.tile(*zone)]
+                    )
+                else:
+                    tiles = list(
+                        tp.tiles_from_bounds(bounds, make_zones_on_zoom)
+                        if make_zones_on_zoom
+                        else [tp.tile(*zone)]
+                    )
                 if force or click.confirm(
                     f"Do you really want to submit {len(tiles)} job(s)?", abort=True
                 ):

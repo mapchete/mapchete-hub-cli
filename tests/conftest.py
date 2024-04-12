@@ -4,35 +4,19 @@ from collections import namedtuple
 import pytest
 import yaml
 from click.testing import CliRunner
-from dask.distributed import LocalCluster
 from fastapi.testclient import TestClient
-from mapchete_hub.app import app, get_backend_db, get_dask_cluster_setup
-from mapchete_hub.db import init_backenddb
+from mapchete_hub.app import app
 
 from mapchete_hub_cli import Client
 from mapchete_hub_cli.cli import mhub
 
-_fake_backend_db = init_backenddb("memory")
-# _dask_cluster = LocalCluster()
-
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-
-
-def fake_backend_db():
-    return _fake_backend_db
-
-
-def local_dask_cluster():
-    return {"flavor": "local_cluster", "cluster": LocalCluster()}
-
-
-app.dependency_overrides[get_backend_db] = fake_backend_db
-app.dependency_overrides[get_dask_cluster_setup] = local_dask_cluster
 
 
 @pytest.fixture(scope="session")
 def client():
-    return TestClient(app)
+    with TestClient(app) as client:
+        yield client
 
 
 @pytest.fixture(scope="session")
