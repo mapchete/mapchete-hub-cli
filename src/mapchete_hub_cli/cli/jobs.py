@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 @options.opt_since
 @options.opt_until
 @options.opt_job_name
+@options.opt_unique_by_job_name
 @options.opt_sort_by
 @options.opt_bounds
 @options.opt_geojson

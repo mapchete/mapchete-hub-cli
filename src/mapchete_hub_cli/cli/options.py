@@ -145,6 +145,11 @@ opt_debug = click.option(
     help="Print debug log output.",
 )
 opt_job_name = click.option("--job-name", type=click.STRING, help="Name of job.")
+opt_unique_by_job_name = click.option(
+    "--unique-by-job-name",
+    is_flag=True,
+    help="Assume jobs with same job name are unique and only return latest job.",
+)
 opt_geojson = click.option("--geojson", "-g", is_flag=True, help="Print as GeoJSON.")
 opt_output_path = click.option(
     "--output-path", "-p", type=click.STRING, help="Filter jobs by output_path."

@@ -68,7 +68,7 @@ class Job:
 
     def __repr__(self):  # pragma: no cover
         """Print Job."""
-        return f"Job(id={self.job_id}, name={self.name}, status={self.status}, updated={self.last_updated})"
+        return f"Job(id={self.job_id}, name={self.name}, status={self.status}, last_updated={self.last_updated})"
 
     def __hash__(self):
         return hash(self.job_id)
