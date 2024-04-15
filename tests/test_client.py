@@ -2,6 +2,7 @@ import datetime
 import json
 import os
 import time
+from uuid import uuid4
 
 import pytest
 from shapely.geometry import shape
@@ -154,6 +155,33 @@ def test_list_jobs_job_name(mhub_client, example_config_json):
     ).job_id
 
     jobs = mhub_client.jobs(job_name="foo")
+    assert job_id in jobs
+
+    jobs = mhub_client.jobs(job_name="bar")
+    assert job_id not in jobs
+
+
+def test_jobs_unique_job_name(mhub_client, example_config_json):
+    job_name = uuid4().hex
+    # submit first job and cancel
+    mhub_client.start_job(
+        **dict(
+            example_config_json,
+            params=dict(example_config_json["params"], zoom=2, job_name=job_name),
+        )
+    ).cancel()
+
+    # submit second job with same name
+    job_id = mhub_client.start_job(
+        **dict(
+            example_config_json,
+            params=dict(example_config_json["params"], zoom=2, job_name=job_name),
+        )
+    ).job_id
+
+    # set unique flag and assert only the second job is returned
+    jobs = mhub_client.jobs(job_name=job_name, unique_by_job_name=True)
+    assert len(jobs) == 1
     assert job_id in jobs
 
     jobs = mhub_client.jobs(job_name="bar")

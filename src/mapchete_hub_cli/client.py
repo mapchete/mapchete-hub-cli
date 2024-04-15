@@ -291,30 +291,58 @@ class Client:
         from_date: Optional[Union[str, datetime.datetime]] = None,
         to_date: Optional[Union[str, datetime.datetime]] = None,
         status: Optional[Union[List[Status], Status]] = None,
+        unique_by_job_name: bool = False,
         **kwargs,
     ) -> Jobs:
         """
         Query interface for jobs.
         """
+        statuses = [s.name for s in to_statuses(status)] if status else []
+        query_params = dict(
+            kwargs,
+            bounds=",".join(map(str, bounds)) if bounds else None,
+            from_date=date_to_str(from_date) if from_date else None,
+            to_date=date_to_str(to_date) if to_date else None,
+            status=",".join(statuses) if statuses else None,
+        )
+
+        # we need to filter out jobs by statuses *after* we created a unique list
+        if unique_by_job_name:
+            query_params.pop("status")
+
         res = self.get(
             "jobs",
             timeout=self.timeout,
-            params=dict(
-                kwargs,
-                bounds=",".join(map(str, bounds)) if bounds else None,
-                from_date=date_to_str(from_date) if from_date else None,
-                to_date=date_to_str(to_date) if to_date else None,
-                status=",".join([s.name for s in to_statuses(status)])
-                if status
-                else None,
-            ),
+            params=query_params,
         )
         if res.status_code != 200:  # pragma: no cover
             try:
                 raise Exception(res.json())
             except JSONDecodeError:
                 raise Exception(res.text)
-        return Jobs.from_dict(res.json(), client=self)
+
+        jobs = res.json()
+
+        if unique_by_job_name:
+            unique_jobs: OrderedDict = OrderedDict()
+            for job_feature in jobs["features"]:
+                job = Job.from_dict(job_feature, client=self)
+                if job.name in unique_jobs:
+                    existing_job = unique_jobs[job.name]
+                    if job.last_updated > existing_job.last_updated:
+                        unique_jobs[job.name] = job
+                else:
+                    unique_jobs[job.name] = job
+            if statuses:
+                jobs["features"] = [
+                    job.to_dict()
+                    for job in unique_jobs.values()
+                    if job.status.name in statuses
+                ]
+            else:
+                jobs["features"] = [job.to_dict() for job in unique_jobs.values()]
+
+        return Jobs.from_dict(jobs, client=self)
 
     def stalled_jobs(
         self,

@@ -15,6 +15,7 @@ from mapchete_hub_cli.job import Jobs
 @options.opt_since_no_default
 @options.opt_until
 @options.opt_job_name
+@options.opt_unique_by_job_name
 @options.opt_force
 @options.opt_overwrite
 @options.opt_debug
