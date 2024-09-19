@@ -274,3 +274,8 @@ opt_zone = click.option(
 opt_use_old_image = click.option(
     "--use-old-image", is_flag=True, help="Force to rerun Job on image from first run."
 )
+opt_test_run = click.option(
+    "--test-run",
+    is_flag=True,
+    help="Run a small scale test to validate mhub infrastructure runtime.",
+)
