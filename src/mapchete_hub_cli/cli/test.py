@@ -6,22 +6,18 @@ from mapchete_hub_cli.client import Client
 MHUB_TEST_BUCKET_KEY = "s3://eox-mhub-cache/mhub_test/"
 
 MAPCHETE_TEST_CONFIG = {
-    "command": "execute",
-    "params": {"zoom": 5, "bounds": [0, 1, 2, 3]},
-    "config": {
-        "process": "mapchete.processes.convert",
-        "input": {
-            "inp": "https://ungarj.github.io/mapchete_testdata/tiled_data/raster/cleantopo/"
-        },
-        "output": {
-            "format": "GTiff",
-            "bands": 1,
-            "dtype": "uint16",
-            "path": MHUB_TEST_BUCKET_KEY,
-        },
-        "pyramid": {"grid": "geodetic", "metatiling": 2},
-        "zoom_levels": {"min": 0, "max": 13},
+    "process": "mapchete.processes.convert",
+    "input": {
+        "inp": "https://ungarj.github.io/mapchete_testdata/tiled_data/raster/cleantopo/"
     },
+    "output": {
+        "format": "GTiff",
+        "bands": 1,
+        "dtype": "uint16",
+        "path": MHUB_TEST_BUCKET_KEY,
+    },
+    "pyramid": {"grid": "geodetic", "metatiling": 2},
+    "zoom_levels": {"min": 0, "max": 13},
     "bounds": [0, 1, 2, 3],
     "dask_specs": {
         "worker_cores": 0.2,
