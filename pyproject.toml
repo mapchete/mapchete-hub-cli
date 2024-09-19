@@ -57,6 +57,8 @@ jobs = "mapchete_hub_cli.cli.jobs:jobs"
 processes = "mapchete_hub_cli.cli.processes:processes"
 progress = "mapchete_hub_cli.cli.progress:progress"
 retry = "mapchete_hub_cli.cli.retry:retry"
+test-run = "mapchete_hub_cli.cli.test:test_run"
+
 
 [project.urls]
 Homepage = "https://gitlab.eox.at/maps/mapchete_hub_cli"

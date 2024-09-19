@@ -4,7 +4,6 @@ import click
 
 from mapchete_hub_cli.cli import options
 from mapchete_hub_cli.cli.progress import show_progress_bar
-from mapchete_hub_cli.cli.test import MAPCHETE_TEST_CONFIG
 from mapchete_hub_cli.client import Client
 from mapchete_hub_cli.parser import load_mapchete_config
 
@@ -31,7 +30,6 @@ from mapchete_hub_cli.parser import load_mapchete_config
 @options.opt_zones_wait_seconds
 @options.opt_zone
 @options.opt_force
-@options.opt_test_run
 @click.pass_context
 def execute(
     ctx,
@@ -51,7 +49,6 @@ def execute(
     zone=None,
     force=False,
     area=None,
-    test_run=False,
     **kwargs,
 ):
     """Execute a process."""
@@ -61,20 +58,6 @@ def execute(
         chunksize=dask_chunksize,
     )
     client = Client(**ctx.obj)
-
-    if test_run is True:
-        job = client.start_job(
-            command="execute",
-            config=MAPCHETE_TEST_CONFIG,
-            params=dict(
-                kwargs,
-                bounds=bounds,
-                mode="overwrite",
-                dask_settings=dask_settings,
-                job_name=job_name,
-            ),
-        )
-        return
 
     for mapchete_file in mapchete_files:
         try:
