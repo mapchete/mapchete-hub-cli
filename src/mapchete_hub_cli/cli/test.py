@@ -17,7 +17,7 @@ MAPCHETE_TEST_CONFIG = {
         "path": MHUB_TEST_BUCKET_KEY,
     },
     "pyramid": {"grid": "geodetic", "metatiling": 2},
-    "zoom_levels": {"min": 0, "max": 13},
+    "zoom_levels": {"min": 0, "max": 6},
     "bounds": [0, 1, 2, 3],
     "dask_specs": {
         "worker_cores": 0.2,
