@@ -13,5 +13,5 @@ repos:
   hooks:
     - id: mypy
       verbose: true
-      args: [--show-error-codes]
-      additional_dependencies: ["types-python-dateutil", "types-retry", "types-croniter"]
+      args: [--show-error-codes, --ignore-missing-imports]
+      additional_dependencies: ["types-click-spinner", "types-requests", "types-PyYAML"]

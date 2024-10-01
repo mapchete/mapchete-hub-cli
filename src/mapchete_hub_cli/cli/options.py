@@ -1,6 +1,7 @@
 import json
 import logging
 from itertools import chain
+from typing import List
 
 import click
 
@@ -9,8 +10,6 @@ from mapchete_hub_cli import (
     JOB_STATUSES,
     MHUB_CLI_ZONES_WAIT_TILES_COUNT,
     MHUB_CLI_ZONES_WAIT_TIME_SECONDS,
-    Client,
-    __version__,
 )
 from mapchete_hub_cli.log import set_log_level
 from mapchete_hub_cli.time import date_to_str, passed_time_to_timestamp, str_to_date
@@ -55,7 +54,7 @@ def _expand_str_list(_, __, str_list):
     return str_list
 
 
-def _validate_mapchete_files(_, __, mapchete_files):
+def _validate_mapchete_files(_, __, mapchete_files) -> List[str]:
     if len(mapchete_files) == 0:
         raise click.MissingParameter("at least one mapchete file required")
     return mapchete_files

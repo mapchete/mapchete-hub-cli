@@ -4,6 +4,7 @@ Convenience tools to communicate with mapchete Hub REST API.
 This module wraps around the requests module for real-life usage and FastAPI's TestClient()
 in order to be able to test mhub CLI.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -27,7 +28,6 @@ from mapchete_hub_cli.time import (
     passed_time_to_timestamp,
     pretty_time_passed,
 )
-from mapchete_hub_cli.types import Progress
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +134,7 @@ class Client:
 
     def start_job(
         self,
-        config: dict,
+        config: Union[dict, str],
         params: Optional[dict] = None,
         command: str = "execute",
         basedir: Optional[str] = None,
