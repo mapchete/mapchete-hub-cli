@@ -1,10 +1,22 @@
 stages:
+  - precommit
   - build
   - test
   - package
 
 # python packaging & EOX PyPy releases #
 ########################################
+
+precommit:
+  stage: codecheck
+  tags:
+    - privileged
+  image: registry.gitlab.eox.at/maps/docker-base/python:3.11-slim-buster
+  before_script:
+    - apt update && apt install -y --no-install-recommends git
+    - pip install pre-commit
+  script:
+    - pre-commit run --all-files
 
 # build python packages
 build_python:
