@@ -114,6 +114,11 @@ opt_area_crs = click.option(
     type=click.STRING,
     help="CRS of --area (does not override CRS of vector file).  [default: process CRS]",
 )
+opt_zones_within_area = click.option(
+    "--zones-within-area",
+    is_flag=True,
+    help="Pick process zones only fully within area.",
+)
 opt_point = click.option(
     "--point",
     "-p",
