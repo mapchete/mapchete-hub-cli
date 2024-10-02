@@ -112,8 +112,12 @@ def execute(
                                 if tile_zone.bbox.within(geometry)
                             ]
 
-                if force or click.confirm(
-                    f"Do you really want to submit {len(zones)} job(s)?", abort=True
+                if (
+                    force
+                    or len(zones) == 1
+                    or click.confirm(
+                        f"Do you really want to submit {len(zones)} jobs?", abort=True
+                    )
                 ):
                     for tile_zone in zones:
                         zone_job_name = (
