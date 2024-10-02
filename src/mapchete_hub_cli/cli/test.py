@@ -44,7 +44,7 @@ def test_run(
     dask_no_task_graph=False,
     dask_max_submitted_tasks=1000,
     dask_chunksize=100,
-    **kwargs
+    **kwargs,
 ):
     """Small test build-in CLI."""
     dask_settings = dict(
