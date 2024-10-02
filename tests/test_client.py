@@ -41,7 +41,7 @@ def test_start_job_python_process(mhub_client, example_config_python_process_jso
     """Start a job and return job status."""
     job = mhub_client.start_job(
         **example_config_python_process_json,
-        basedir=os.path.dirname(os.path.realpath(__file__))
+        basedir=os.path.dirname(os.path.realpath(__file__)),
     )
     job.wait(wait_for_max=120)
     assert mhub_client.job(job.job_id).status == Status.done

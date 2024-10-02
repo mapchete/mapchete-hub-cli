@@ -1,7 +1,7 @@
 import click
 
 from mapchete_hub_cli.cli import options
-from mapchete_hub_cli.client import JOB_STATUSES, Client
+from mapchete_hub_cli.client import Client
 from mapchete_hub_cli.job import Jobs
 
 

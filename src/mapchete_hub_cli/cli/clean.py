@@ -1,16 +1,9 @@
 import logging
 
 import click
-import requests
 
 from mapchete_hub_cli.cli import options
-from mapchete_hub_cli.client import Client, Job
-from mapchete_hub_cli.enums import Status
-from mapchete_hub_cli.time import (
-    date_to_str,
-    passed_time_to_timestamp,
-    pretty_time_passed,
-)
+from mapchete_hub_cli.client import Client
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,5 @@
 from time import sleep
+from typing import List, Optional, Tuple
 
 import click
 
@@ -32,23 +33,23 @@ from mapchete_hub_cli.parser import load_mapchete_config
 @options.opt_force
 @click.pass_context
 def execute(
-    ctx,
-    mapchete_files,
-    bounds=None,
-    overwrite=False,
-    verbose=False,
-    debug=False,
-    dask_no_task_graph=False,
-    dask_max_submitted_tasks=1000,
-    dask_chunksize=100,
-    make_zones_on_zoom=None,
-    full_zones=False,
-    zones_wait_count=5,
-    zones_wait_seconds=10,
-    job_name=None,
-    zone=None,
-    force=False,
-    area=None,
+    ctx: click.Context,
+    mapchete_files: List[str],
+    bounds: Optional[Tuple[float, float, float, float]] = None,
+    overwrite: bool = False,
+    verbose: bool = False,
+    debug: bool = False,
+    dask_no_task_graph: bool = False,
+    dask_max_submitted_tasks: int = 1000,
+    dask_chunksize: int = 100,
+    make_zones_on_zoom: Optional[int] = None,
+    full_zones: int = False,
+    zones_wait_count: int = 5,
+    zones_wait_seconds: int = 10,
+    job_name: Optional[str] = None,
+    zone: Optional[str] = None,
+    force: bool = False,
+    area: Optional[str] = None,
     **kwargs,
 ):
     """Execute a process."""
@@ -76,8 +77,7 @@ def execute(
                     raise ImportError(
                         "please install mapchete_hub_cli[zones] extra for this feature."
                     )
-                config = load_mapchete_config(mapchete_file)
-                tp = TilePyramid(config["pyramid"]["grid"])
+                tp = TilePyramid(load_mapchete_config(mapchete_file)["pyramid"]["grid"])
                 if area:
                     geometry, crs = guess_geometry(area)
                     if crs != tp.crs:  # pragma: no cover

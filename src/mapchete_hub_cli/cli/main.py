@@ -1,22 +1,14 @@
+from importlib import metadata
+
 import click
 from click_plugins import with_plugins
 
 from mapchete_hub_cli import DEFAULT_TIMEOUT, __version__
 from mapchete_hub_cli.client import Client
 
-try:
-    from importlib import metadata
-except ImportError:  # pragma: no cover
-    # <PY38 use backport
-    import importlib_metadata as metadata
-
 
 entry_points = metadata.entry_points()
-if hasattr(entry_points, "select"):  # for Python 3.10 and higher
-    commands = entry_points.select(group="mapchete_hub_cli.cli.commands")
-else:  # for Python 3.9 and lower
-    commands = entry_points.get("mapchete_hub_cli.cli.commands", {})
-
+commands = entry_points.select(group="mapchete_hub_cli.cli.commands")
 
 host_options = dict(host_ip="0.0.0.0", port=5000)
 

@@ -3,7 +3,7 @@ import logging
 import click
 
 from mapchete_hub_cli.cli import options
-from mapchete_hub_cli.client import JOB_STATUSES, Client, Job, Jobs
+from mapchete_hub_cli.client import Client, Jobs
 
 logger = logging.getLogger(__name__)
 

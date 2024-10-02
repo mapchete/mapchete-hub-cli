@@ -4,7 +4,6 @@ import click
 import oyaml as yaml
 
 from mapchete_hub_cli.cli import options
-from mapchete_hub_cli.cli.progress import show_progress_bar
 from mapchete_hub_cli.client import Client, Job
 from mapchete_hub_cli.enums import Status
 from mapchete_hub_cli.time import pretty_time, pretty_time_passed, str_to_date
