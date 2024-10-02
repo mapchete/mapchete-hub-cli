@@ -58,6 +58,7 @@ def execute(
         chunksize=dask_chunksize,
     )
     client = Client(**ctx.obj)
+
     for mapchete_file in mapchete_files:
         try:
             if make_zones_on_zoom is not None and (
