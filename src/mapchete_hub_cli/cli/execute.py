@@ -14,6 +14,7 @@ from mapchete_hub_cli.parser import load_mapchete_config
 @options.opt_zoom
 @options.opt_area
 @options.opt_area_crs
+@options.opt_zones_within_area
 @options.opt_bounds
 @options.opt_point
 @options.opt_tile
@@ -50,6 +51,7 @@ def execute(
     zone: Optional[str] = None,
     force: bool = False,
     area: Optional[str] = None,
+    zones_within_area: bool = False,
     **kwargs,
 ):
     """Execute a process."""
@@ -71,47 +73,60 @@ def execute(
             elif make_zones_on_zoom is not None or zone is not None:
                 try:
                     from mapchete.config.parse import guess_geometry
-                    from shapely.geometry import box
-                    from tilematrix import TilePyramid
+                    from mapchete.tile import BufferedTilePyramid, BufferedTile
                 except ImportError:  # pragma: no cover
                     raise ImportError(
                         "please install mapchete_hub_cli[zones] extra for this feature."
                     )
-                tp = TilePyramid(load_mapchete_config(mapchete_file)["pyramid"]["grid"])
-                if area:
-                    geometry, crs = guess_geometry(area)
-                    if crs != tp.crs:  # pragma: no cover
-                        raise ValueError(
-                            f"area CRS ({crs}) must be the same as TilePyramid CRS ({tp.crs})"
-                        )
-                    if bounds:
-                        geometry = geometry.intersection(box(*bounds))
-                    tiles = list(
-                        tp.tiles_from_geom(geometry, make_zones_on_zoom)
-                        if make_zones_on_zoom
-                        else [tp.tile(*zone)]
-                    )
+                tp = BufferedTilePyramid(
+                    load_mapchete_config(mapchete_file)["pyramid"]["grid"]
+                )
+                zones: List[BufferedTile] = []
+                if zone:
+                    zones = [tp.tile(*zone)]
                 else:
-                    tiles = list(
-                        tp.tiles_from_bounds(bounds, make_zones_on_zoom)
-                        if make_zones_on_zoom
-                        else [tp.tile(*zone)]
-                    )
+                    if bounds:
+                        zones = [
+                            tile_zone
+                            for tile_zone in tp.tiles_from_bounds(
+                                bounds, make_zones_on_zoom
+                            )
+                        ]
+                    if area:
+                        geometry, crs = guess_geometry(area)
+                        if crs != tp.crs:  # pragma: no cover
+                            raise ValueError(
+                                f"area CRS ({crs}) must be the same as BufferedTilePyramid CRS ({tp.crs})"
+                            )
+                        zones = zones or [
+                            tile_zone
+                            for tile_zone in tp.tiles_from_geom(
+                                geometry, make_zones_on_zoom
+                            )
+                        ]
+
+                        if zones_within_area:
+                            zones = [
+                                tile_zone
+                                for tile_zone in zones
+                                if tile_zone.bbox.within(geometry)
+                            ]
+
                 if force or click.confirm(
-                    f"Do you really want to submit {len(tiles)} job(s)?", abort=True
+                    f"Do you really want to submit {len(zones)} job(s)?", abort=True
                 ):
-                    for tile in tiles:
+                    for tile_zone in zones:
                         zone_job_name = (
-                            f"{job_name}-{tile.zoom}-{tile.row}-{tile.col}"
+                            f"{job_name}-{tile_zone.zoom}-{tile_zone.row}-{tile_zone.col}"
                             if job_name
                             else None
                         )
                         process_bounds = (
-                            bounds_intersection(bounds, tile.bounds())
+                            bounds_intersection(bounds, tile_zone.bounds)
                             if (bounds and not full_zones)
-                            else tile.bounds()
+                            else tile_zone.bounds
                         )
-                        if len(tiles) >= zones_wait_count:  # pragma: no cover
+                        if len(zones) >= zones_wait_count:  # pragma: no cover
                             sleep(zones_wait_seconds)
                         job = client.start_job(
                             command="execute",
