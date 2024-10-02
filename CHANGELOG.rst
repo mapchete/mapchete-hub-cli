@@ -3,6 +3,33 @@ Changelog
 #########
 
 
+----------------------
+2024.10.0 - 2024-10-02
+----------------------
+
+    * core
+
+        * add `test-run` subcommand
+        * `execute`: add `--zones-within-area` flag
+        * add `show-remote-version` subcommand to replace `--show-remote-version` flag
+  
+    * packaging
+
+      * switch pre-commit tools to `ruff` and `mypy`
+      
+    * CI
+
+      * add codecheck stage
+
+
+---------------------
+2024.4.1 - 2024-04-15
+---------------------
+
+    * core
+
+        * `execute`: add `--unique-by-job-name` flag
+
 ---------------------
 2024.4.0 - 2024-04-12
 ---------------------
