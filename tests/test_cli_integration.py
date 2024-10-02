@@ -36,8 +36,8 @@ def test_cli(cli):
     not ENDPOINT_AVAILABLE,
     reason="requires up and running endpoint using docker-compose",
 )
-def test_remote_versions(cli):
-    result = cli.run("--remote-versions")
+def test_remote_version(cli):
+    result = cli.run("show-remote-version")
     assert result.exit_code == 0
     assert "20" in result.output
 

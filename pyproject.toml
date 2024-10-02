@@ -57,6 +57,7 @@ job = "mapchete_hub_cli.cli.job:job"
 jobs = "mapchete_hub_cli.cli.jobs:jobs"
 processes = "mapchete_hub_cli.cli.processes:processes"
 progress = "mapchete_hub_cli.cli.progress:progress"
+show_remote_version = "mapchete_hub_cli.cli.show_remote_version:show_remote_version"
 retry = "mapchete_hub_cli.cli.retry:retry"
 test-run = "mapchete_hub_cli.cli.test:test_run"
 
