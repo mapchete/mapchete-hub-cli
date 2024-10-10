@@ -1,29 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from dateutil import parser
 from typing import Union
 
 
 def str_to_date(date_str: str) -> datetime:
     """Convert string to datetime object."""
-    for divider in ["T", " "]:
-        if divider in date_str:
-            add_zulu = "Z" if date_str.endswith("Z") else ""
-            try:
-                return datetime.strptime(
-                    date_str, f"%Y-%m-%d{divider}%H:%M:%S.%f" + add_zulu
-                )
-            except ValueError:
-                return datetime.strptime(
-                    date_str, f"%Y-%m-%d{divider}%H:%M:%S" + add_zulu
-                )
-    values = date_str.split("-")
-    if len(values) != 3:
-        raise ValueError(f"cannot parse {date_str} to timestamp")
-    # for e.g. 2024-01-01
-    try:
-        year, month, day = map(int, values)
-    except ValueError:  # pragma: no cover
-        raise ValueError(f"cannot extract year, month and day from {date_str}")
-    return datetime(year, month, day)
+    return parser.parse(date_str)
 
 
 def date_to_str(date_obj: Union[str, datetime], microseconds=True) -> str:
@@ -46,7 +28,7 @@ def passed_time_to_timestamp(passed_time: str) -> datetime:
     }
     for k, v in time_types.items():
         if passed_time.endswith(k):
-            return datetime.utcnow() - timedelta(**{v: int(passed_time[:-1])})
+            return datetime.now(timezone.utc) - timedelta(**{v: int(passed_time[:-1])})
     else:
         raise ValueError(f"cannot not convert {passed_time} to timestamp")
 
@@ -66,4 +48,4 @@ def pretty_time(elapsed_seconds: float) -> str:
 
 
 def pretty_time_passed(timestamp: datetime) -> str:
-    return pretty_time((datetime.utcnow() - timestamp).total_seconds())
+    return pretty_time((datetime.now(timezone.utc) - timestamp).total_seconds())

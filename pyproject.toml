@@ -26,6 +26,7 @@ classifiers = [
 dependencies = [
     "click",
     "click_spinner",
+    "dateutil",
     "oyaml",
     "pydantic",
     "requests",
