@@ -32,10 +32,10 @@ from mapchete_hub_cli.time import (
 logger = logging.getLogger(__name__)
 
 MHUB_CLI_ZONES_WAIT_TILES_COUNT = int(
-    os.environ.get("MHUB_CLI_ZONES_WAIT_TILES_COUNT", "5")
+    os.environ.get("MHUB_CLI_ZONES_WAIT_TILES_COUNT", "100")
 )
-MHUB_CLI_ZONES_WAIT_TIME_SECONDS = int(
-    os.environ.get("MHUB_CLI_ZONES_WAIT_TIME_SECONDS", "10")
+MHUB_CLI_ZONES_WAIT_TIME_SECONDS = float(
+    os.environ.get("MHUB_CLI_ZONES_WAIT_TIME_SECONDS", "1")
 )
 DEFAULT_TIMEOUT = int(os.environ.get("MHUB_CLI_DEFAULT_TIMEOUT", "5"))
 
