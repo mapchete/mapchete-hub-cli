@@ -30,16 +30,16 @@ def _check_dask_specs(_, __, dask_specs):
             return json.loads(src.read())
 
 
-def _get_timestamp(_, __, timestamp):
+def _get_utc_timestamp(_, __, timestamp):
     """Convert timestamp to datetime object."""
-
     if timestamp:
         try:
-            # for a convertable timestamp like '2019-11-01T15:00:00'
-            timestamp = str_to_date(timestamp)
+            # for a shortcut like "1d", "2h", etc.
+            timestamp = passed_time_to_timestamp(timestamp)
         except ValueError:
             try:
-                timestamp = passed_time_to_timestamp(timestamp)
+                # for a convertable timestamp like '2019-11-01T15:00:00'
+                timestamp = str_to_date(timestamp)
             except ValueError:
                 raise click.BadParameter(
                     """either provide a timestamp like '2019-11-01T15:00:00' or a time """
@@ -201,7 +201,7 @@ opt_dask_no_task_graph = click.option(
 opt_since = click.option(
     "--since",
     type=click.STRING,
-    callback=_get_timestamp,
+    callback=_get_utc_timestamp,
     help="Filter jobs by timestamp since given time.",
     default="7d",
     show_default=True,
@@ -209,13 +209,13 @@ opt_since = click.option(
 opt_since_no_default = click.option(
     "--since",
     type=click.STRING,
-    callback=_get_timestamp,
+    callback=_get_utc_timestamp,
     help="Filter jobs by timestamp since given time.",
 )
 opt_until = click.option(
     "--until",
     type=click.STRING,
-    callback=_get_timestamp,
+    callback=_get_utc_timestamp,
     help="Filter jobs by timestamp until given time.",
 )
 opt_job_ids = click.option(

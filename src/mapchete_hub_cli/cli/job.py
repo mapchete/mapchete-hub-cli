@@ -6,7 +6,7 @@ import oyaml as yaml
 from mapchete_hub_cli.cli import options
 from mapchete_hub_cli.client import Client, Job
 from mapchete_hub_cli.enums import Status
-from mapchete_hub_cli.time import pretty_time, pretty_time_passed, str_to_date
+from mapchete_hub_cli.time import pretty_time, pretty_time_since, str_to_date
 
 
 @click.command(short_help="Show job status.")
@@ -121,13 +121,11 @@ def print_job_details(
         # bounds
         click.echo(f"bounds: {job.bounds}")
 
-        # start time
-        started = job.properties.get("started", "unknown")
-        click.echo(f"started: {started}")
-
-        # finish time
-        finished = job.properties.get("finished", "unknown")
-        click.echo(f"finished: {finished}")
+        # started, updated, finished time
+        for time_property in ["started", "updated", "finished"]:
+            click.echo(
+                f"{time_property}: {job.properties.get(time_property, 'unknown')}"
+            )
 
         # runtime
         runtime = job.properties.get("runtime", "unknown")
@@ -136,7 +134,7 @@ def print_job_details(
         # last received update
         last_update = job.properties.get("updated", "unknown")
         click.echo(
-            f"last received update: {pretty_time_passed(str_to_date(last_update))} ago"
+            f"last received update: {pretty_time_since(str_to_date(last_update))} ago"
         )
 
     if metadata_items:
