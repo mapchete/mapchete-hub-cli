@@ -1,3 +1,5 @@
+import time
+
 import click
 
 from mapchete_hub_cli.cli import options
@@ -38,12 +40,16 @@ MAPCHETE_TEST_CONFIG = {
 @options.opt_dask_max_submitted_tasks
 @options.opt_dask_chunksize
 @options.opt_dask_no_task_graph
+@click.option("--count", "-c", type=click.INT, default=1, show_default=True)
+@click.option("--wait-time", "-w", type=click.FLOAT, default=0.5, show_default=True)
 @click.pass_context
 def test_run(
     ctx,
-    dask_no_task_graph=False,
-    dask_max_submitted_tasks=1000,
-    dask_chunksize=100,
+    dask_no_task_graph: bool = False,
+    dask_max_submitted_tasks: int = 1000,
+    dask_chunksize: int = 100,
+    count: int = 1,
+    wait_time: float = 0.5,
     **kwargs,
 ):
     """Small test build-in CLI."""
@@ -54,14 +60,18 @@ def test_run(
     )
     client = Client(**ctx.obj)
 
-    client.start_job(
-        command="execute",
-        config=MAPCHETE_TEST_CONFIG,
-        params=dict(
-            kwargs,
-            bounds=MAPCHETE_TEST_CONFIG["bounds"],
-            mode="overwrite",
-            dask_settings=dask_settings,
-            job_name="mhub_cli_test_run",
-        ),
-    )
+    for _ in range(count):
+        job = client.start_job(
+            command="execute",
+            config=MAPCHETE_TEST_CONFIG,
+            params=dict(
+                kwargs,
+                bounds=MAPCHETE_TEST_CONFIG["bounds"],
+                mode="overwrite",
+                dask_settings=dask_settings,
+                job_name="mhub_cli_test_run",
+            ),
+        )
+        click.echo(job.job_id)
+        if count > 1:
+            time.sleep(wait_time)
