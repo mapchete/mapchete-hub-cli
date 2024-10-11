@@ -26,16 +26,16 @@ from mapchete_hub_cli.parser import load_mapchete_config
 from mapchete_hub_cli.time import (
     date_to_str,
     passed_time_to_timestamp,
-    pretty_time_passed,
+    pretty_time_since,
 )
 
 logger = logging.getLogger(__name__)
 
 MHUB_CLI_ZONES_WAIT_TILES_COUNT = int(
-    os.environ.get("MHUB_CLI_ZONES_WAIT_TILES_COUNT", "5")
+    os.environ.get("MHUB_CLI_ZONES_WAIT_TILES_COUNT", "100")
 )
-MHUB_CLI_ZONES_WAIT_TIME_SECONDS = int(
-    os.environ.get("MHUB_CLI_ZONES_WAIT_TIME_SECONDS", "10")
+MHUB_CLI_ZONES_WAIT_TIME_SECONDS = float(
+    os.environ.get("MHUB_CLI_ZONES_WAIT_TIME_SECONDS", "1")
 )
 DEFAULT_TIMEOUT = int(os.environ.get("MHUB_CLI_DEFAULT_TIMEOUT", "5"))
 
@@ -363,7 +363,7 @@ class Client:
             )
             if msg_writer:
                 msg_writer(
-                    f"{job.job_id} {job.status} since {pretty_time_passed(job.last_updated)}"
+                    f"{job.job_id} {job.status} since {pretty_time_since(job.last_updated)}"
                 )
             stalled.add(job)
 
@@ -381,7 +381,7 @@ class Client:
                 )
                 if msg_writer:
                     msg_writer(
-                        f"{job.job_id} {job.status} but has been inactive since {pretty_time_passed(job.last_updated)}"
+                        f"{job.job_id} {job.status} but has been inactive since {pretty_time_since(job.last_updated)}"
                     )
                 stalled.add(job)
 
@@ -402,7 +402,7 @@ class Client:
                         )
                         if msg_writer:
                             msg_writer(
-                                f"{job.job_id} {job.status} but has inactive dashboard (status code {status_code}, job inactive since {pretty_time_passed(job.last_updated)})"
+                                f"{job.job_id} {job.status} but has inactive dashboard (status code {status_code}, job inactive since {pretty_time_since(job.last_updated)})"
                             )
                         stalled.add(job)
 

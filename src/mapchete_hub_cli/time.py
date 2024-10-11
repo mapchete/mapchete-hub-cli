@@ -1,29 +1,14 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from dateutil import parser
 from typing import Union
 
 
-def str_to_date(date_str: str) -> datetime:
+def str_to_date(date_str: str, to_utc: bool = False) -> datetime:
     """Convert string to datetime object."""
-    for divider in ["T", " "]:
-        if divider in date_str:
-            add_zulu = "Z" if date_str.endswith("Z") else ""
-            try:
-                return datetime.strptime(
-                    date_str, f"%Y-%m-%d{divider}%H:%M:%S.%f" + add_zulu
-                )
-            except ValueError:
-                return datetime.strptime(
-                    date_str, f"%Y-%m-%d{divider}%H:%M:%S" + add_zulu
-                )
-    values = date_str.split("-")
-    if len(values) != 3:
-        raise ValueError(f"cannot parse {date_str} to timestamp")
-    # for e.g. 2024-01-01
-    try:
-        year, month, day = map(int, values)
-    except ValueError:  # pragma: no cover
-        raise ValueError(f"cannot extract year, month and day from {date_str}")
-    return datetime(year, month, day)
+    timestamp = parser.parse(date_str)
+    if to_utc:
+        return timestamp.astimezone(timezone.utc)
+    return timestamp
 
 
 def date_to_str(date_obj: Union[str, datetime], microseconds=True) -> str:
@@ -35,7 +20,7 @@ def date_to_str(date_obj: Union[str, datetime], microseconds=True) -> str:
     )
 
 
-def passed_time_to_timestamp(passed_time: str) -> datetime:
+def passed_time_to_timestamp(passed_time: str, to_utc: bool = True) -> datetime:
     # for a time range like '1d', '12h', '30m'
     time_types = {
         "w": "weeks",
@@ -46,7 +31,14 @@ def passed_time_to_timestamp(passed_time: str) -> datetime:
     }
     for k, v in time_types.items():
         if passed_time.endswith(k):
-            return datetime.utcnow() - timedelta(**{v: int(passed_time[:-1])})
+            # get localized timestamp for here and now and substract passed time
+            timestamp = datetime.now().astimezone() - timedelta(
+                **{v: int(passed_time[:-1])}
+            )
+            if to_utc:
+                # return UTC time
+                return timestamp.astimezone(timezone.utc)
+            return timestamp
     else:
         raise ValueError(f"cannot not convert {passed_time} to timestamp")
 
@@ -65,5 +57,5 @@ def pretty_time(elapsed_seconds: float) -> str:
         return f"{round(seconds, 3)}s"
 
 
-def pretty_time_passed(timestamp: datetime) -> str:
-    return pretty_time((datetime.utcnow() - timestamp).total_seconds())
+def pretty_time_since(timestamp: datetime) -> str:
+    return pretty_time((datetime.now().astimezone() - timestamp).total_seconds())
