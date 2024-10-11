@@ -4,6 +4,16 @@ Changelog
 
 
 ----------------------
+2024.10.1 - 2024-10-11
+----------------------
+
+    * core
+
+        * add `--count` and `--wait-time` options to `test-run` subcommand
+        * make sure every generated timestamp for here and now has a localized timezone and can optionally be converted to UTC
+
+
+----------------------
 2024.10.0 - 2024-10-02
 ----------------------
 
