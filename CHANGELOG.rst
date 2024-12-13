@@ -4,6 +4,15 @@ Changelog
 
 
 ----------------------
+2024.12.0 - 2024-12-13
+----------------------
+
+    * core
+
+        * `execute`: fix issue where providing bounds and area, zones would be all zones intersecting with area bounds
+
+
+----------------------
 2024.10.1 - 2024-10-11
 ----------------------
 
