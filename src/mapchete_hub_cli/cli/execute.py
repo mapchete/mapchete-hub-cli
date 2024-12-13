@@ -111,7 +111,12 @@ def execute(
                                 for tile_zone in zones
                                 if tile_zone.bbox.within(geometry)
                             ]
-
+                        else:
+                            zones = [
+                                tile_zone
+                                for tile_zone in zones
+                                if tile_zone.bbox.intersects(geometry)
+                            ]
                 if (
                     force
                     or len(zones) == 1
