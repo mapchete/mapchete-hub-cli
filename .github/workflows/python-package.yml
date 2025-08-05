@@ -53,8 +53,6 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REQUEST_PAYER: ${{ secrets.AWS_REQUEST_PAYER }}
-          CURL_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
         run: pytest -v --cov mapchete-hub-cli --cov-report xml:coverage.xml --cov-report=term-missing:skip-covered --junitxml=pytest.xml
 
       # Upload the report to Codecov
