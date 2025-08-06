@@ -25,7 +25,6 @@ The mapchete Hub CLI provides a user-friendly command line interface (``mhub``) 
 
 This CLI is the recommended tool for users who want to script workflows or manage mapchete Hub jobs from their terminal.
 
----
 
 Key Features
 ============
@@ -35,7 +34,6 @@ Key Features
 * **🔒 Authentication Support**: Handles basic authentication via command line options (``-u``, ``-p``) or environment variables.
 * **🤖 Script-Friendly**: Designed for easy integration into automated scripts and workflows.
 
----
 
 Installation
 ============
@@ -46,7 +44,6 @@ Install the CLI and its dependencies from PyPI:
 
    pip install mapchete-hub-cli
 
----
 
 Quickstart
 ==========
@@ -94,7 +91,7 @@ The mapchete Hub will return a unique `job_id`:
 
 .. code-block:: text
 
-   Job submitted with ID: 6227b68b-b7e6-4f40-a396-85763197f481
+   6227b68b-b7e6-4f40-a396-85763197f481
 
 **5. Check Job Status and Progress**
 
@@ -120,7 +117,6 @@ You can also list all jobs or cancel a running job:
    # Cancel a specific job
    mhub -h 0.0.0.0:5000 cancel 6227b68b-b7e6-4f40-a396-85763197f481
 
----
 
 Contributing
 ============
