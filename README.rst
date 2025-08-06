@@ -30,7 +30,7 @@ Key Features
 ============
 
 * **💻 Full Job Lifecycle Management**: Intuitive commands to ``execute``, ``job`` (status), ``jobs`` (list), ``cancel``, and ``retry`` processing jobs.
-* **⚙️ Hub Inspection**: List available ``processes`` on a remote mapchete Hub and check remote package ``--remote-versions``.
+* **⚙️ Inspection**: List available ``processes`` on a remote mapchete Hub and check remote package ``--remote-versions``.
 * **🔒 Authentication Support**: Handles basic authentication via command line options (``-u``, ``-p``) or environment variables.
 * **🤖 Script-Friendly**: Designed for easy integration into automated scripts and workflows.
 
