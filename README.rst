@@ -12,7 +12,7 @@ A command line interface for mapchete Hub.
 .. image:: https://img.shields.io/github/actions/workflow/status/mapchete/mapchete-hub-cli/python-package.yml?label=tests
   :target: https://github.com/mapchete/mapchete-hub-cli/actions
 
-.. image:: https://codecov.io/gh/mapchete/mapchete-hub-cli/graph/badge.svg?token=VD1YOF3QA2
+.. image:: https://codecov.io/gh/mapchete/mapchete-hub-cli/graph/badge.svg?token=P1NV2UFVWK
   :target: https://codecov.io/gh/mapchete/mapchete-hub-cli
 
 .. image:: https://img.shields.io/github/repo-size/mapchete/mapchete-hub-cli
