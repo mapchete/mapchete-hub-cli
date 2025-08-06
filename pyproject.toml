@@ -64,7 +64,7 @@ test-run = "mapchete_hub_cli.cli.test:test_run"
 
 
 [project.urls]
-Homepage = "https://gitlab.eox.at/maps/mapchete_hub_cli"
+Homepage = "https://github.com/mapchete/mapchete-hub-cli"
 
 [tool.hatch.version]
 path = "src/mapchete_hub_cli/__init__.py"
