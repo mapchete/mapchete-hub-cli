@@ -196,13 +196,15 @@ def test_list_jobs_from_date(mhub_client, example_config_json):
         )
     ).job_id
 
-    now = datetime.datetime.utcfromtimestamp(time.time()).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = datetime.datetime.fromtimestamp(time.time(), datetime.timezone.utc).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
     jobs = mhub_client.jobs(from_date=now)
     assert job_id in jobs
 
-    future = datetime.datetime.utcfromtimestamp(time.time() + 60).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
+    future = datetime.datetime.fromtimestamp(
+        time.time() + 60, datetime.timezone.utc
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
     jobs = mhub_client.jobs(from_date=future)
     assert job_id not in jobs
 
@@ -215,15 +217,15 @@ def test_list_jobs_to_date(mhub_client, example_config_json):
         )
     ).job_id
 
-    now = datetime.datetime.utcfromtimestamp(time.time() + 60).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
+    now = datetime.datetime.fromtimestamp(
+        time.time() + 60, datetime.timezone.utc
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
     jobs = mhub_client.jobs(to_date=now)
     assert job_id in jobs
 
-    past = datetime.datetime.utcfromtimestamp(time.time() - 60).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
+    past = datetime.datetime.fromtimestamp(
+        time.time() - 60, datetime.timezone.utc
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
     jobs = mhub_client.jobs(to_date=past)
     assert job_id not in jobs
 
