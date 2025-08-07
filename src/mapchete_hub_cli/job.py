@@ -74,7 +74,7 @@ class Job:
         return hash(self.job_id)
 
     def __eq__(self, other):
-        if not isinstance(other, Job):
+        if not isinstance(other, Job):  # pragma: no cover
             return False
         return self.job_id == other.job_id
 
