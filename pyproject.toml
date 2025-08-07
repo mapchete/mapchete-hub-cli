@@ -36,8 +36,6 @@ dependencies = [
 [project.optional-dependencies]
 zones = [
     "mapchete",
-    "shapely",
-    "tilematrix"
 ]
 test = [
     "mapchete_hub>=2023.12.0",
