@@ -73,6 +73,11 @@ class Job:
     def __hash__(self):
         return hash(self.job_id)
 
+    def __eq__(self, other):
+        if not isinstance(other, Job):
+            return False
+        return self.job_id == other.job_id
+
     def _update(self, job: Job):
         self.status = job.status
         self._dict = job._dict
