@@ -2,6 +2,21 @@
 Changelog
 #########
 
+---------------------
+2025.9.0 - 2025-09-02
+---------------------
+
+* packaging
+
+  * add `click-plugins` as dependency (#5)
+  * add `uv.lock` file (#5)
+
+
+* CI
+
+  * use new `mapchete/mapchete` image for testing (#5)
+  * add python `3.13` to test matrix (#5)
+
 
 ---------------------
 2025.8.0 - 2025-08-06
