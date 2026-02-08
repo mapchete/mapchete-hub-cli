@@ -1,17 +1,13 @@
 name: Python package test
 
 on:
+  schedule:
+    - cron: '0 8 * * 1,4'  
   push:
     branches: ['**']
     tags: ['*']
-    paths-ignore:
-      - "docs/**"
   pull_request:
     branches: ['**']
-    paths-ignore:
-      - "docs/**"
-  schedule:
-    - cron: '0 8 * * 1,4'
   workflow_call:
     inputs:
       override-deps-artifact:
