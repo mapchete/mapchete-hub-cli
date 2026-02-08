@@ -107,7 +107,7 @@ jobs:
 
       - name: 🐳 Start containers (MinIO & Nginx)
         run: |
-          docker compose -f "test/docker-compose.yml" up -d          
+          docker compose -f "docker-compose.yml" up -d          
          
       - name: 🧪 Run Tests
         env:
