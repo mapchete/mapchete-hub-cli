@@ -91,9 +91,8 @@ jobs:
       
       - name: ⚡ Install uv & git
         run: |
-          sudo apt-add-repository -y ppa:ubuntugis/ubuntugis-unstable
           sudo apt-get update
-          sudo apt-get install -y curl git gpg gdal-bin libgdal-dev libproj-dev libgeos-dev g++
+          sudo apt-get install -y curl git gpg
 
           curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh          
           
@@ -108,10 +107,13 @@ jobs:
 
       - name: 🐳 Start containers
         run: |
-          docker compose -f "docker-compose.yml" up -d      
+          docker compose -f "docker-compose.yml" up -d     
+          
+          timeout 60s bash -c 'until curl -s localhost:5000 > /dev/null; do sleep 2; done' || (docker compose logs && exit 1)
          
       - name: 🧪 Run Tests
         env:
+          MHUB_ENV: testing
           CURL_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
           COVERAGE_FILE: .coverage.python.${{ matrix.python-version }}
         run: |
