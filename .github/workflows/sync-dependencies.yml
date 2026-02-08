@@ -69,12 +69,15 @@ jobs:
             fi
             
           else
-            # 💤 CASE 3: Absolutely nothing changed
             echo "changed=false" >> $GITHUB_OUTPUT
             
             echo "### ✅ Everything is Up-to-Date" >> $GITHUB_STEP_SUMMARY
             echo "No changes detected in \`uv.lock\`." >> $GITHUB_STEP_SUMMARY
-            echo "💤 **Action:** Skipping tests and PR creation." >> $GITHUB_STEP_SUMMARY
+            if [ "${{ github.event_name }}" == "pull_request" ]; then
+              echo "🚀 **Action:** Running tests to verify PR state." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "💤 **Action:** Skipping tests and PR creation." >> $GITHUB_STEP_SUMMARY
+            fi
           fi
 
       - name: 📤 Upload Updated Deps
@@ -88,8 +91,7 @@ jobs:
 
   run-tests:
     needs: sync-and-prepare
-    # Always run tests on Pull Requests to satisfy mandatory status checks.
-    # On other events (like schedule), only run if a sync was actually needed.
+
     if: |
       always() &&
       needs.sync-and-prepare.result == 'success' &&
