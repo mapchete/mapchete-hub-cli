@@ -86,6 +86,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: updated-deps
+          retention-days: 1
           path: |
             uv.lock
             conda/meta.yaml
