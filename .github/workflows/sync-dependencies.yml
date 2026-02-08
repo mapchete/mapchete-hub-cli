@@ -88,10 +88,15 @@ jobs:
 
   run-tests:
     needs: sync-and-prepare
-    if: needs.sync-and-prepare.outputs.sync_needed == 'true'
+    # Always run tests on Pull Requests to satisfy mandatory status checks.
+    # On other events (like schedule), only run if a sync was actually needed.
+    if: |
+      always() &&
+      needs.sync-and-prepare.result == 'success' &&
+      (needs.sync-and-prepare.outputs.sync_needed == 'true' || github.event_name == 'pull_request')
     uses: ./.github/workflows/python-package.yml
     with:
-      override-deps-artifact: updated-deps
+      override-deps-artifact: ${{ needs.sync-and-prepare.outputs.sync_needed == 'true' && 'updated-deps' || '' }}
     secrets: inherit
 
   finalize:
