@@ -37,7 +37,7 @@ MHUB_CLI_ZONES_WAIT_TILES_COUNT = int(
 MHUB_CLI_ZONES_WAIT_TIME_SECONDS = float(
     os.environ.get("MHUB_CLI_ZONES_WAIT_TIME_SECONDS", "1")
 )
-DEFAULT_TIMEOUT = int(os.environ.get("MHUB_CLI_DEFAULT_TIMEOUT", "5"))
+DEFAULT_TIMEOUT = int(os.environ.get("MHUB_CLI_DEFAULT_TIMEOUT", "10"))
 
 JOB_STATUSES = {
     "todo": [Status.pending],

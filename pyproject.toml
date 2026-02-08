@@ -5,6 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "mapchete-hub-cli"
 dynamic = ["version"]
+requires-python = ">=3.11"
 description = "CLI and Python bindings to mapchete Hub API."
 readme = "README.rst"
 license = "MIT"
@@ -16,9 +17,9 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: GIS",
 ]
 dependencies = [
@@ -31,7 +32,6 @@ dependencies = [
     "requests",
     "tqdm",
 ]
-requires-python = ">=3.9"
 
 [project.optional-dependencies]
 zones = [
@@ -71,3 +71,16 @@ path = "src/mapchete_hub_cli/__init__.py"
 include = [
     "/src",
 ]
+
+[tool.pytest.ini_options]
+env =
+    MHUB_ENV=testing
+addopts = [
+    "--durations=20",
+    "--verbose",
+    "--nf",
+    "--cov=mapchete_hub_cli",
+    "--cov-report=term-missing:skip-covered",
+    "--cov-append"
+]
+testpaths = ["tests"]
