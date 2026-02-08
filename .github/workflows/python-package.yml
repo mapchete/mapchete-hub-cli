@@ -89,20 +89,25 @@ jobs:
         with:
           name: ${{ inputs.override-deps-artifact }}          
       
-      - name: ⚡ Install uv & git
+      - name: ⚡ Install uv, Docker Compose & git
         run: |
           sudo apt-get update
           sudo apt-get install -y curl git gpg
 
           curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh          
-
+          
+          docker compose --version
           uv --version
 
       - name: 🏗️ Restore Native Env
         run: |
           uv venv --python ${{ matrix.python-version }}
           uv pip install -r requirements.txt
-          uv pip install -e ".[test]" --no-deps      
+          uv pip install -e ".[test]" --no-deps
+
+      - name: 🐳 Start containers (MinIO & Nginx)
+        run: |
+          docker compose -f "test/docker-compose.yml" up -d          
          
       - name: 🧪 Run Tests
         env:
