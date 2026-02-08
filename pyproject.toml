@@ -73,8 +73,9 @@ include = [
 ]
 
 [tool.pytest.ini_options]
-env =
-    MHUB_ENV=testing
+env = [
+    "MHUB_ENV=testing",
+]
 addopts = [
     "--durations=20",
     "--verbose",
