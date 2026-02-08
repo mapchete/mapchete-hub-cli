@@ -86,6 +86,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: updated-deps
+          retention-days: 1
           path: |
             uv.lock
             conda/meta.yaml
@@ -94,7 +95,7 @@ jobs:
     needs: sync-and-prepare
     uses: ./.github/workflows/python-package.yml
     with:
-      override-deps-artifact: ${{ needs.sync-and-prepare.outputs.sync_needed == 'true' && 'updated-deps' || '' }}
+      override-deps-artifact: ${{ needs.sync-and-prepare.outputs.sync_needed == 'true' && 'updated-deps' || '' }}      
     secrets: inherit
 
   finalize:
