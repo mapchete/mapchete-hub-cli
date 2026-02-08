@@ -109,6 +109,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          token: ${{ secrets.MAPCHETE_PAT_CONTAINER_IMAGES_TOKEN }}
 
       - name: 📥 Download Verified Artifacts
         uses: actions/download-artifact@v4
@@ -125,13 +126,13 @@ jobs:
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
           
           echo "### 🚀 PR Updated" >> $GITHUB_STEP_SUMMARY
-          echo "Pushed verified changes to existing PR." >> $GITHUB_STEP_SUMMARY
+          echo "Pushed verified changes to existing PR. CI will re-run now." >> $GITHUB_STEP_SUMMARY
 
       - name: ➕ Create New Pull Request
         if: github.event_name != 'pull_request'
         uses: peter-evans/create-pull-request@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.MAPCHETE_PAT_CONTAINER_IMAGES_TOKEN }}
           commit-message: "chore: update uv.lock and conda recipe"
           title: "chore(deps): sync uv and conda"
           body: |
