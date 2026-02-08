@@ -89,7 +89,7 @@ jobs:
         with:
           name: ${{ inputs.override-deps-artifact }}          
       
-      - name: ⚡ Install uv, Docker Compose & git
+      - name: ⚡ Install uv & git
         run: |
           sudo apt-get update
           sudo apt-get install -y curl git gpg
@@ -111,10 +111,6 @@ jobs:
          
       - name: 🧪 Run Tests
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REQUEST_PAYER: ${{ vars.AWS_REQUEST_PAYER }}
-          AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
           CURL_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
           COVERAGE_FILE: .coverage.python.${{ matrix.python-version }}
         run: |
