@@ -2,7 +2,8 @@ name: Python package test
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
+    tags: ['*']
     paths-ignore:
       - "docs/**"
   pull_request:
