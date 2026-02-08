@@ -166,7 +166,7 @@ jobs:
           echo "### 🧪 Test & Coverage Summary" >> $GITHUB_STEP_SUMMARY
           
           # 1. CHECK OVERALL TEST STATUS
-          if [[ "${{ needs.test.result }}" != "success"; then
+          if [[ "${{ needs.test.result }}" != "success" ]]; then
             echo "❌ **Test Suite Failed**" >> $GITHUB_STEP_SUMMARY
             echo "Coverage check skipped because tests failed." >> $GITHUB_STEP_SUMMARY
             exit 1
@@ -177,14 +177,14 @@ jobs:
           uv tool install coverage
           
           # Move the specific 3.13 files to root
-          # The pattern matches .coverage.3.13.1, .coverage.3.13.2, etc.
+          # The pattern matches .coverage.python.3.13
           mv all-results/.coverage* .
           
           echo "Merging coverage files..."
           uv tool run coverage combine
           
-          # 3. ENFORCE 70%
-          OUTPUT=$(uv tool run coverage report --show-missing --fail-under=70 2>&1)
+          # 3. ENFORCE 100%
+          OUTPUT=$(uv tool run coverage report --show-missing --fail-under=100 2>&1)
           EXIT_CODE=$?
           
           echo "$OUTPUT"
@@ -194,10 +194,10 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           
           if [ $EXIT_CODE -ne 0 ]; then
-            echo "❌ **Coverage Failed:** Python 3.13 coverage is below 70%." >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Coverage Failed:** Python 3.13 coverage is below 100%." >> $GITHUB_STEP_SUMMARY
             # Exit with the original code to fail the build
             exit $EXIT_CODE
           else
-            echo "✅ **Coverage Passed:** 70% coverage achieved (Py3.13)." >> $GITHUB_STEP_SUMMARY
+            echo "✅ **Coverage Passed:** 100% coverage achieved (Py3.13)." >> $GITHUB_STEP_SUMMARY
             exit 0
           fi
