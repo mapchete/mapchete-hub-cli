@@ -107,7 +107,21 @@ jobs:
 
       - name: 🐳 Start containers
         run: |
-          docker compose -f "docker-compose.yml" up -d          
+          docker compose -f "docker-compose.yml" up -d    
+                   
+      - name: 🔗 Connect Pytest to Compose Network
+        run: |
+          # 1. Identify the container pytest is running in
+          # In GitHub Actions job containers, the hostname is the container ID
+          SELF_ID=$(hostname)
+          
+          # 2. Join the frontend network created by compose
+          # From your logs, the name is 'mapchete-hub-cli_frontend'
+          docker network connect mapchete-hub-cli_frontend $SELF_ID
+          
+          # 3. Optional: Verify connectivity
+          # This ensures the 'server' name is now resolvable
+          docker exec $SELF_ID ping -c 1 server || echo "Ping failed, but network connected"          
          
       - name: 🧪 Run Tests
         env:

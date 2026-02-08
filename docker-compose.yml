@@ -68,9 +68,7 @@ services:
       ]
 
 volumes:
-  db-data:
-
-    null
+  db-data: null
 networks:
   backend: null
   frontend: null
