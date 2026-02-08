@@ -14,7 +14,7 @@ services:
     command: [ "--bind_ip_all" ]
 
   server:
-    image: ghcr.io/mapchete/mapchete:2025.9.0
+    image: ghcr.io/mapchete/mapchete:2026.2.0
     depends_on:
       - dask_scheduler
       - db
@@ -39,7 +39,7 @@ services:
       ]
 
   dask_scheduler:
-    image: ghcr.io/mapchete/mapchete:2025.9.0
+    image: ghcr.io/mapchete/mapchete:2026.2.0
     networks:
       - backend
     command:
@@ -52,7 +52,7 @@ services:
       ]
 
   dask_worker:
-    image: ghcr.io/mapchete/mapchete:2025.9.0
+    image: ghcr.io/mapchete/mapchete:2026.2.0
     depends_on:
       - dask_scheduler
     networks:
@@ -68,9 +68,7 @@ services:
       ]
 
 volumes:
-  db-data:
-
-    null
+  db-data: null
 networks:
   backend: null
   frontend: null
