@@ -8,6 +8,7 @@ in order to be able to test mhub CLI.
 from __future__ import annotations
 
 import datetime
+import json
 import logging
 import os
 import time
@@ -191,8 +192,9 @@ class Client:
         logger.debug("send job to API")
         res = self.post(
             f"processes/{command}/execution",
-            json=job,
+            data=json.dumps(job, default=str),
             timeout=self.timeout,
+            headers={"Content-Type": "application/json"},
         )
 
         if res.status_code != 201:  # pragma: no cover
