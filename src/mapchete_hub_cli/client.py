@@ -194,6 +194,7 @@ class Client:
             f"processes/{command}/execution",
             data=json.dumps(job, default=str),
             timeout=self.timeout,
+            headers={"Content-Type": "application/json"},
         )
 
         if res.status_code != 201:  # pragma: no cover
