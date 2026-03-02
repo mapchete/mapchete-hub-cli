@@ -3,6 +3,19 @@ Changelog
 #########
 
 ---------------------
+2026.3.0 - 2026-03-02
+---------------------
+
+* core
+
+  * add add "Content-Type" header when sending a POST request (#22)
+
+* CI
+
+  * use `ghcr.io/mapchete/mapchete:2026.2.2` for testing (#22)
+
+
+---------------------
 2025.9.0 - 2025-09-02
 ---------------------
 
