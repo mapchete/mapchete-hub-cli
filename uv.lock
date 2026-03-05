@@ -329,7 +329,6 @@ dependencies = [
     { name = "jmespath" },
     { name = "s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/58/15/356d38280ce3fce37a8e2b44e2ead81240d933f64411e86415a2ed4c0bd5/boto3-1.42.61.tar.gz", hash = "sha256:117ebfc597c95bfb64c6d37ba77bd1c2a97a1885c1dcac2a8be1a14e2139a76d", size = 112750, upload-time = "2026-03-04T20:30:53.73Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/66/d7/a2fa875cb7c5d6b5c5cf6fc181343708c8dc6cafae3e6964ed486ae21bea/boto3-1.42.61-py3-none-any.whl", hash = "sha256:156efcc298a33206be6dfd220815c64aa8b09424017534cabe717636961fc306", size = 140555, upload-time = "2026-03-04T20:30:51.17Z" },
 ]
@@ -1912,7 +1911,7 @@ wheels = [
 
 [[package]]
 name = "mapchete"
-version = "2026.2.2"
+version = "2026.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -1942,9 +1941,9 @@ dependencies = [
     { name = "tilematrix" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fd/49/ddf66902dab655d80d0b0adea4ab3924d433f8ea7841bb7ae6520e0d3810/mapchete-2026.2.2.tar.gz", hash = "sha256:5e532af6c3e20e8e85e51cb950d03817f0c59156f3da8cb0646124c4db89ad12", size = 164278, upload-time = "2026-02-27T08:32:25.546Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bf/24/3fb9ef659bfec54223b918aa652b96ab1f3c188b41e509c1ca4b6e191108/mapchete-2026.3.0.tar.gz", hash = "sha256:176349a0ed0096ada46f18fc55b2c44d85d6c9e0296380bee92743d78b35f2cf", size = 165347, upload-time = "2026-03-05T10:00:14.858Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/e2/de635a348ab6bcf2ea88a419b7fefe0b1e4a8efc96499769aa67efd90167/mapchete-2026.2.2-py3-none-any.whl", hash = "sha256:d1604f1887d5f3bf39262a790f3abd225305fa7a4918e04ff61ab167395cd3c7", size = 232743, upload-time = "2026-02-27T08:32:27.729Z" },
+    { url = "https://files.pythonhosted.org/packages/9e/81/c88de84169a18cc2ffc19c31e38a4e099717ea6faa650265178881748e5b/mapchete-2026.3.0-py3-none-any.whl", hash = "sha256:f111a72aaea9843c93c014472c0237180abdc9d1f7ba9e8d4e7ed0e5c929bf89", size = 233868, upload-time = "2026-03-05T10:00:16.325Z" },
 ]
 
 [package.optional-dependencies]
