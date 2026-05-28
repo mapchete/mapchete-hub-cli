@@ -133,7 +133,6 @@ jobs:
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
           
-          # Test Status
           if [[ "${{ needs.test.result }}" == "success" ]]; then
             echo "| Unit Tests | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
           else
@@ -143,6 +142,10 @@ jobs:
           # 2. PREPARE COVERAGE DATA
           uv tool install coverage
           
+          echo "DEBUG: Content of all-results:"
+          ls -R all-results || echo "all-results not found"
+          
+          # Move files from download path
           if ls all-results/.coverage* 1> /dev/null 2>&1; then
             mv all-results/.coverage* .
           fi
@@ -150,28 +153,45 @@ jobs:
           # 🧹 Delete empty files
           find . -maxdepth 1 -name ".coverage*" -size 0 -print -delete
           
-          echo "Merging/Preparing coverage data..."
-          # combine will merge .coverage.* into .coverage
-          uv tool run coverage combine --append || echo "No extra coverage files to combine."
+          echo "Processing coverage files..."
+          FILES=$(ls .coverage.* 2>/dev/null | wc -l)
+          if [ "$FILES" -gt 0 ]; then
+            if [ "$FILES" -eq 1 ]; then
+              echo "Single coverage file found, renaming to .coverage"
+              mv .coverage.* .coverage
+            else
+              echo "Multiple coverage files found, combining..."
+              uv tool run coverage combine
+            fi
+          else
+            echo "⚠️ No coverage files found to process."
+          fi
           
           # 3. ENFORCE 70%
-          echo "Generating coverage report..."
-          set +e
-          REPORT_OUTPUT=$(uv tool run coverage report --show-missing --fail-under=70 2>&1)
-          EXIT_CODE=$?
-          set -e
-          
-          echo "$REPORT_OUTPUT"
-          
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "$REPORT_OUTPUT" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          
-          if [ $EXIT_CODE -ne 0 ]; then
-            echo "❌ **Coverage Failed:** Coverage is below 70%." >> $GITHUB_STEP_SUMMARY
-            exit $EXIT_CODE
+          if [ -f .coverage ]; then
+            echo "Generating coverage report..."
+            set +e
+            REPORT_OUTPUT=$(uv tool run coverage report --show-missing --fail-under=70 2>&1)
+            EXIT_CODE=$?
+            set -e
+            
+            echo "$REPORT_OUTPUT"
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "$REPORT_OUTPUT" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+
+            # 🔗 GENERATE DYNAMIC CODECOV LINK
+            CODECOV_URL="https://app.codecov.io/github/${{ github.repository }}/commit/${{ github.sha }}"
+            echo "🔗 **[View full line-by-line report on Codecov]($CODECOV_URL)**" >> $GITHUB_STEP_SUMMARY
+            
+            if [ $EXIT_CODE -ne 0 ]; then
+              echo "❌ **Coverage Failed:** Coverage is below 70%." >> $GITHUB_STEP_SUMMARY
+              exit $EXIT_CODE
+            else
+              echo "✅ **Coverage Passed:** 70% coverage achieved." >> $GITHUB_STEP_SUMMARY
+            fi
           else
-            echo "✅ **Coverage Passed:** 70% coverage achieved." >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Error:** No coverage data (.coverage) produced." >> $GITHUB_STEP_SUMMARY
           fi
 
           # Fail overall if test failed
