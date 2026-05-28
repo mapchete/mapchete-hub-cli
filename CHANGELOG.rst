@@ -2,6 +2,19 @@
 Changelog
 #########
 
+Unreleased
+----------
+
+* CI/CD
+
+  * modernize workflows for `uv 0.5+`
+  * upgrade all GitHub Actions to May 2026 versions (utilizing Node.js 24)
+  * standardized on `astral-sh/setup-uv@v8.1.0` (immutable release)
+  * fix GitHub API rate limit issues by providing `GITHUB_TOKEN` to `setup-uv`
+  * use `uv sync --frozen` for test environment management
+  * enable `uv` caching and add `uv cache prune --ci` steps
+
+
 ---------------------
 2026.3.0 - 2026-03-02
 ---------------------
