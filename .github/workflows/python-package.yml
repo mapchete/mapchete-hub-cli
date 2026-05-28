@@ -30,6 +30,7 @@ jobs:
         with:
           enable-cache: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache-suffix: ${{ github.job }}
       - name: 🏃 Run Pre-commit
         run: |
           uv tool install pre-commit
@@ -58,6 +59,7 @@ jobs:
         with:
           enable-cache: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache-suffix: ${{ matrix.python-version }}
 
       - name: 🏗️ Sync Environment
         run: |
@@ -85,7 +87,7 @@ jobs:
         if: matrix.python-version == '3.13'
         uses: actions/upload-artifact@v7
         with:
-          name: coverage-chunk
+          name: coverage-chunk-all
           path: .coverage.python.${{ matrix.python-version }}
           include-hidden-files: true
           retention-days: 1
@@ -114,6 +116,7 @@ jobs:
         with:
           enable-cache: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache-suffix: ${{ github.job }}
 
       - name: 📥 Download Artifacts
         uses: actions/download-artifact@v8
@@ -126,13 +129,16 @@ jobs:
         run: |
           echo "### 🧪 Test & Coverage Summary" >> $GITHUB_STEP_SUMMARY
           
-          # 1. CHECK OVERALL TEST STATUS
-          if [[ "${{ needs.test.result }}" != "success" ]]; then
-            echo "❌ **Test Suite Failed**" >> $GITHUB_STEP_SUMMARY
-            echo "Coverage check skipped because tests failed." >> $GITHUB_STEP_SUMMARY
-            exit 1
+          # 1. STATUS REPORT
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+          
+          # Test Status
+          if [[ "${{ needs.test.result }}" == "success" ]]; then
+            echo "| Unit Tests | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Unit Tests | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
           fi
-          echo "✅ **Test Suite Passed**" >> $GITHUB_STEP_SUMMARY
 
           # 2. PREPARE COVERAGE DATA
           uv tool install coverage
@@ -141,13 +147,19 @@ jobs:
             mv all-results/.coverage* .
           fi
           
+          # 🧹 Delete empty files
+          find . -maxdepth 1 -name ".coverage*" -size 0 -print -delete
+          
           echo "Merging/Preparing coverage data..."
           # combine will merge .coverage.* into .coverage
           uv tool run coverage combine --append || echo "No extra coverage files to combine."
           
           # 3. ENFORCE 70%
+          echo "Generating coverage report..."
+          set +e
           REPORT_OUTPUT=$(uv tool run coverage report --show-missing --fail-under=70 2>&1)
           EXIT_CODE=$?
+          set -e
           
           echo "$REPORT_OUTPUT"
           
@@ -156,8 +168,13 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           
           if [ $EXIT_CODE -ne 0 ]; then
-            echo "❌ **Coverage Failed:** Python 3.13 coverage is below 70%." >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Coverage Failed:** Coverage is below 70%." >> $GITHUB_STEP_SUMMARY
             exit $EXIT_CODE
           else
-            echo "✅ **Coverage Passed:** 70% coverage achieved (Py3.13)." >> $GITHUB_STEP_SUMMARY
+            echo "✅ **Coverage Passed:** 70% coverage achieved." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Fail overall if test failed
+          if [[ "${{ needs.test.result }}" != "success" ]]; then
+            exit 1
           fi
