@@ -410,7 +410,7 @@ wheels = [
 
 [[package]]
 name = "bokeh"
-version = "3.10.1"
+version = "3.10.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -426,9 +426,9 @@ dependencies = [
     { name = "tornado", marker = "sys_platform != 'emscripten'" },
     { name = "xyzservices" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/04/ab/19f33e7442fe2f09378bdafa95d088a1ed0dd078ea1f3d676c28d3cf2ed7/bokeh-3.10.1.tar.gz", hash = "sha256:e1dc21c4fa02f793b7c6acb2b439311924f46912b1d1ae1c7b058f8245b54fe8", size = 6053211, upload-time = "2026-10-13T16:53:00.445Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/00/9f/76e8aaa9517278879568d568a58a4437a2eeddb88681382922c262c55acd/bokeh-3.10.2.tar.gz", hash = "sha256:d9fba1004fae149c6e6d54ba37410e52b8d4622ed5c6dad2220afa1b61362de0", size = 6060293, upload-time = "2026-11-05T18:31:20.653Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4e/9c/aaf2f11e31a75f0fffc79659ad7f0be01f39bb018bbc83c2a8a02657589e/bokeh-3.10.1-py3-none-any.whl", hash = "sha256:d73412b6317f70df0ffe6796956af609617523dfdfbc624d4f7f496cd09e8101", size = 6721259, upload-time = "2026-10-13T16:52:58.309Z" },
+    { url = "https://files.pythonhosted.org/packages/82/5f/ff36efde54b136494f1badebb1e6290f7b0e40387b249f27faf4362b17b8/bokeh-3.10.2-py3-none-any.whl", hash = "sha256:511f0c3ecbd396012b65b677826c92ccfa4e951a25484da068fed46b1183b154", size = 6729346, upload-time = "2026-11-05T18:31:18.603Z" },
 ]
 
 [[package]]
@@ -461,11 +461,11 @@ wheels = [
 
 [[package]]
 name = "cachetools"
-version = "7.2.8"
+version = "7.3.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/93/6f/faa5e0606769105e70e0478031a8f9a6b729e329f42ce2462585c6d9aa52/cachetools-7.2.8.tar.gz", hash = "sha256:3f9b146b2160975da273e7c23ec882f3996b65df608150d52083c07de0682075", size = 47821, upload-time = "2026-10-31T21:37:51.986Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5f/6b/6c1553e1e8f672f9423344a1915aad1537439ad3d14a3fbc1a02159cfd94/cachetools-7.3.0.tar.gz", hash = "sha256:3f63fc208410f0c3a3b37883c4903ecdacd6f0b259134e6d2e82debd5b2e01de", size = 48563, upload-time = "2026-11-05T20:38:46.434Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0c/35/2fb720060bb278759da35f2076fab1af4e9d66e3add080e6b40d6e25ba48/cachetools-7.2.8-py3-none-any.whl", hash = "sha256:09b04a85741d0019b3fb7d02b7ee9933a422fa6923af92a0fd63b893b695830c", size = 19646, upload-time = "2026-10-31T21:37:50.278Z" },
+    { url = "https://files.pythonhosted.org/packages/29/aa/e54a49d0927b2fa7b86bc94dbde57125e38e8cfca7a31b6764e8dbf35e9f/cachetools-7.3.0-py3-none-any.whl", hash = "sha256:2105787c94619bde7072624fec0fe7b8a08bb7bf6c757c318f8925573c6f07c9", size = 19575, upload-time = "2026-11-05T20:38:44.928Z" },
 ]
 
 [[package]]
@@ -1771,23 +1771,23 @@ wheels = [
 
 [[package]]
 name = "jsonpatch"
-version = "1.42"
+version = "1.44"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jsonpointer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/67/f6/4b1c0352b99b71e80d3eac306b9431a46ff109a314ba0a48b4b4bd3b9761/jsonpatch-1.42.tar.gz", hash = "sha256:8d553ab33cc1e5d3da60b8be5224355fb28cde863cc8935c40f011a8c0d72ad4", size = 65555, upload-time = "2026-11-04T12:32:39.036Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/e0/5fff51896a5556c44890b4d211278284d6a4c847e509b4e585e5f4616060/jsonpatch-1.44.tar.gz", hash = "sha256:88fc1d9728168b4a9be27bb00de469dfb3cd28e8e5b568b24efb2ac583cba7b9", size = 66776, upload-time = "2026-11-06T11:42:33.614Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0b/0e/f304972d58bdae95d130e3b2fbbf46da4ba40a5e6983b73e82e3471a0de3/jsonpatch-1.42-py3-none-any.whl", hash = "sha256:0a94e8725b8b53cafdf3eba3112a7ccd31ea420bb04e6374096d9d17bf4563e9", size = 23038, upload-time = "2026-11-04T12:32:37.816Z" },
+    { url = "https://files.pythonhosted.org/packages/6f/56/890cb3357504efa2f9848ffa7df18e9e2583402aeeccbba2dc1c9318f5bb/jsonpatch-1.44-py3-none-any.whl", hash = "sha256:801f9238740d19eb101f9f7cea9c1c4810dbc4746f3edc89f7751d1798b917ff", size = 23283, upload-time = "2026-11-06T11:42:31.234Z" },
 ]
 
 [[package]]
 name = "jsonpointer"
-version = "3.8"
+version = "3.10"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/c2/cf/5d665216bd9dea19dd26ea93ca525ef02936a9cccd0cd856f8408eb77f0b/jsonpointer-3.8.tar.gz", hash = "sha256:a627a255641390bfb4d51d4cfbb90648078ae855b45804ef7e19ea13a4cca355", size = 19212, upload-time = "2026-11-02T21:52:18.838Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/93/f6/d1109cbb2c7cb692b432071802028052ba8d275c613c1a1cce427bc62c97/jsonpointer-3.10.tar.gz", hash = "sha256:69349c0e738c93e9efa501397091f49ad302ae686293effd05d7755c06f88ef0", size = 19950, upload-time = "2026-11-06T11:39:07.229Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/76/61/20f3a497beac4c8f869b8161b468b31c0f05d9d73600da0313eb759bad8a/jsonpointer-3.8-py3-none-any.whl", hash = "sha256:d69af85adaea202111bbc931067ead68dc16bca4592c74e1a1953152e2a330ab", size = 10233, upload-time = "2026-11-02T21:52:17.617Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/66/25cbb926e981a849d1cfcd36817fba6bfa5e9b6a2944c41230fe83ff25d2/jsonpointer-3.10-py3-none-any.whl", hash = "sha256:3b08b9e5239f1b683e31c9561c350d75ce3fa8cdd407130ca8491fdb0c9e56f3", size = 10376, upload-time = "2026-11-06T11:39:06.069Z" },
 ]
 
 [[package]]
@@ -2371,7 +2371,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "bokeh", version = "3.9.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "bokeh", version = "3.10.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "bokeh", version = "3.10.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "click" },
     { name = "dask" },
     { name = "dask-gateway" },
